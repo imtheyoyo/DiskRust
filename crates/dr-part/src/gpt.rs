@@ -242,9 +242,9 @@ fn load_gpt_at(
                 continue;
             }
         }
-        let units: Vec<u16> = e[56..128.min(e.len())]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        let name_bytes = &e[56..128.min(e.len())];
+        let units: Vec<u16> = (0..name_bytes.len() / 2)
+            .map(|i| u16::from_le_bytes([name_bytes[2 * i], name_bytes[2 * i + 1]]))
             .take_while(|&u| u != 0)
             .collect();
         parts.push(Partition {
