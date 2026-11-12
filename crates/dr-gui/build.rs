@@ -13,6 +13,7 @@ fn main() {
             ["diskrust-gui"],
             embed_resource::NONE,
         )
-        .manifest_required();
+        .manifest_required()
+        .expect("échec de l'intégration du manifeste Windows");
     }
 }
