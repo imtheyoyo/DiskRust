@@ -29,6 +29,7 @@ de fichiers et recherche de partitions perdues.
 | `dr-fs`   | détection FAT12/16/32, NTFS, exFAT, ext2/3/4 ; `probe(dev, start_lba)` |
 | `dr-search` | recherche rapide (balayage aligné sur les cylindres et sur 1 Mio), `check_structure()` |
 | `dr-cli`  | binaire `diskrust` |
+| `dr-gui`  | binaire `diskrust-gui` : interface graphique `eframe`/`egui` (lecture seule), modèle sans écran testable dans `model.rs` |
 
 ## État d'avancement
 
@@ -42,10 +43,54 @@ de fichiers et recherche de partitions perdues.
 | Analyse GPT + repli sur la table de secours | fait |
 | Détection FAT / NTFS / exFAT / ext2-4 | fait (signature et géométrie seulement) |
 | Recherche rapide | fait |
+| Interface graphique (`dr-gui`) | fait (compilée par la CI Windows ; affichage non vérifié sur machine Windows réelle) |
 | Recherche des superblocs de secours ext | À FAIRE (ébauche) |
 | Recherche approfondie (autres systèmes de fichiers, parcours MFT/inodes) | À FAIRE |
 | Liste des fichiers / récupération de fichiers supprimés | À FAIRE |
 | Toute opération d'écriture | volontairement absente (À FAIRE, drapeau de confirmation explicite obligatoire) |
+
+## Interface graphique (Windows)
+
+`diskrust-gui` est une fenêtre `eframe`/`egui` strictement **en lecture seule** :
+un bandeau permanent rappelle qu'aucune écriture n'est effectuée sur le disque.
+
+```console
+$ cargo build --release -p dr-gui
+$ target\release\diskrust-gui.exe        # Windows
+$ cargo run --release -p dr-gui           # lancement direct
+```
+
+Description de l'interface :
+
+- **Panneau de gauche** : liste des disques physiques (chemin et taille), boutons
+  « Actualiser » et « Ouvrir une image… » (boîte de dialogue native, fichiers
+  `.dd`, `.img`, `.raw` ou tous les fichiers).
+- **Panneau central** : taille et octets par secteur du disque, type de table de
+  partitions, avertissements et erreurs, tableau des partitions (numéro,
+  amorçable, genre, type, début, fin, taille, système de fichiers et étiquette),
+  « Structure : Ok / Mauvaise » avec la liste des problèmes.
+- **Recherche rapide** : exécutée dans un fil d'exécution séparé avec barre de
+  progression ; les systèmes de fichiers trouvés sont marqués « dans la table »
+  ou « candidat à la récupération ». Il n'y a pas de bouton « Annuler » : l'API
+  de recherche ne permet pas d'interrompre un balayage en cours.
+- **Rapport** : « Exporter le rapport… » (fichier `.txt`) et « Copier le
+  rapport » (presse-papiers), avec le même texte que `diskrust list` /
+  `diskrust analyse` (via la bibliothèque `dr-cli`).
+- Barre d'état et fenêtre « À propos » (version, licence MIT OU Apache-2.0).
+
+**Droits d'administrateur.** Le manifeste Windows demande `asInvoker` : l'ouverture
+d'une image `.dd` ne nécessite aucun privilège, alors que `requireAdministrator`
+l'imposerait même pour de simples fichiers. Pour lister et lire les disques
+physiques (`\\.\PhysicalDriveN`), lancez le programme en tant qu'administrateur
+(l'interface le rappelle : « Pour lister les disques physiques, lancez le
+programme en tant qu'administrateur »).
+
+**Garantie de lecture seule.** Les disques et images sont ouverts uniquement en
+lecture ; le seul fichier écrit est le rapport `.txt` choisi explicitement par
+l'utilisateur.
+
+Sans écran (CI Linux, tests) : `cargo test -p dr-gui --no-default-features`
+ne compile que le modèle (`model.rs`) et ses tests sur images synthétiques.
 
 ## Utilisation
 

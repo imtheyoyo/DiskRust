@@ -6,6 +6,7 @@ members = [
     "crates/dr-fs",
     "crates/dr-search",
     "crates/dr-cli",
+    "crates/dr-gui",
 ]
 
 [workspace.package]

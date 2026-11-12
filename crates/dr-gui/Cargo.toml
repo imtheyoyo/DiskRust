@@ -1,0 +1,36 @@
+[package]
+name = "dr-gui"
+description = "Interface graphique (Windows d'abord) de diskrust, en lecture seule"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+build = "build.rs"
+
+[lib]
+name = "dr_gui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "diskrust-gui"
+path = "src/main.rs"
+required-features = ["ui"]
+
+[features]
+# `ui` active la fenêtre eframe/egui et la boîte de dialogue native. Sans elle
+# (`--no-default-features`), seul le modèle `model` est compilé (tests sans écran).
+default = ["ui"]
+ui = ["dep:eframe", "dep:rfd"]
+
+[dependencies]
+dr-disk = { workspace = true }
+dr-part = { workspace = true }
+dr-fs = { workspace = true }
+dr-search = { workspace = true }
+dr-cli = { path = "../dr-cli", version = "0.1.0" }
+eframe = { version = "0.37", optional = true }
+rfd = { version = "0.18", optional = true }
+
+[build-dependencies]
+embed-resource = "3"
