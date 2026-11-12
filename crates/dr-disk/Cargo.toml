@@ -1,6 +1,6 @@
 [package]
 name = "dr-disk"
-description = "Read-only block device abstraction (raw images, physical disks)"
+description = "Abstraction de périphérique bloc en lecture seule (images brutes, disques physiques)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -4,7 +4,7 @@ use crate::gpt::{parse_gpt, GPT_SIGNATURE};
 use crate::mbr::{parse_mbr, parse_mbr_sector};
 use crate::types::{Partition, TableType};
 
-/// Decide which partition table family is present.
+/// Détermine quelle famille de table de partitions est présente.
 pub fn detect_table_type(dev: &dyn BlockDevice) -> TableType {
     if dev.sector_size() < 512 {
         return TableType::Unknown;
@@ -17,7 +17,7 @@ pub fn detect_table_type(dev: &dyn BlockDevice) -> TableType {
         .map(|s| &s[..8] == GPT_SIGNATURE)
         .unwrap_or(false);
     if let Ok(entries) = parse_mbr_sector(&s0) {
-        // A filesystem boot sector (superfloppy) also ends in 0x55AA.
+        // Un secteur de démarrage de système de fichiers (superfloppy) se termine aussi par 0x55AA.
         if &s0[3..11] == b"NTFS    " || &s0[3..11] == b"EXFAT   " {
             return TableType::Unknown;
         }
@@ -36,20 +36,20 @@ pub fn detect_table_type(dev: &dyn BlockDevice) -> TableType {
     }
 }
 
-/// Everything known about a disk's partition table.
+/// Tout ce qui est connu de la table de partitions d'un disque.
 #[derive(Debug, Clone)]
 pub struct TableInfo {
-    /// Detected family.
+    /// Famille détectée.
     pub table_type: TableType,
-    /// Partitions (empty on failure or for blank disks).
+    /// Partitions (vide en cas d'échec ou pour les disques vierges).
     pub partitions: Vec<Partition>,
-    /// Diagnostics (e.g. "Trying alternate GPT").
+    /// Diagnostics (par ex. « Tentative avec la GPT de secours »).
     pub warnings: Vec<String>,
-    /// Fatal parse error, if any.
+    /// Erreur d'analyse fatale, le cas échéant.
     pub error: Option<String>,
 }
 
-/// Detect and parse the partition table of a device.
+/// Détecte et analyse la table de partitions d'un périphérique.
 pub fn read_table(dev: &dyn BlockDevice) -> TableInfo {
     let table_type = detect_table_type(dev);
     let mut info = TableInfo {
@@ -73,7 +73,7 @@ pub fn read_table(dev: &dyn BlockDevice) -> TableInfo {
             }
             Err(crate::PartError::NoValidGpt(log)) => {
                 info.warnings = log;
-                info.error = Some("No valid GPT found".to_string());
+                info.error = Some("Aucune GPT valide trouvée".to_string());
             }
             Err(e) => info.error = Some(e.to_string()),
         },

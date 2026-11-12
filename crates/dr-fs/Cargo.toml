@@ -1,6 +1,6 @@
 [package]
 name = "dr-fs"
-description = "Filesystem signature detection (FAT, NTFS, exFAT, ext2/3/4)"
+description = "Détection de signatures de systèmes de fichiers (FAT, NTFS, exFAT, ext2/3/4)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

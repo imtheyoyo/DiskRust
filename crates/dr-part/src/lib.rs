@@ -1,7 +1,7 @@
-//! Partition table parsers: MBR/EBR (Intel) and GPT.
+//! Analyseurs de tables de partitions : MBR/EBR (Intel) et GPT.
 //!
-//! Implemented from the public format specifications (UEFI spec for GPT,
-//! the classic PC MBR layout for Intel tables).
+//! Implémentés à partir des spécifications publiques des formats (spécification
+//! UEFI pour GPT, disposition MBR classique des PC pour les tables Intel).
 
 mod detect;
 mod gpt;

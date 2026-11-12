@@ -7,15 +7,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use clap::{Args, Parser, Subcommand};
 use dr_disk::{enumerate_disks, BlockDevice, FileImage, PhysicalDisk};
 
-/// Read-only partition recovery toolkit (clean-room implementation).
+/// Boîte à outils d'analyse de partitions en lecture seule.
 #[derive(Parser)]
 #[command(name = "diskrust", version, about)]
 struct Cli {
-    /// Append a diskrust.log-like transcript to FILE (default: diskrust.log).
+    /// Ajoute une transcription dans FICHIER (par défaut : diskrust.log).
     #[arg(
         long,
         global = true,
-        value_name = "FILE",
+        value_name = "FICHIER",
         num_args = 0..=1,
         default_missing_value = "diskrust.log"
     )]
@@ -26,18 +26,18 @@ struct Cli {
 
 #[derive(Args)]
 struct Target {
-    /// Raw disk image file (.dd) instead of a device.
-    #[arg(long, value_name = "FILE", conflicts_with = "device")]
+    /// Fichier image disque brut (.dd) au lieu d'un périphérique.
+    #[arg(long, value_name = "FICHIER", conflicts_with = "device")]
     image: Option<PathBuf>,
-    /// Device path, e.g. /dev/sda or \\.\PhysicalDrive0.
+    /// Chemin du périphérique, par ex. /dev/sda ou \\.\PhysicalDrive0.
     device: Option<String>,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// List disks and their partition tables (disk and partition listing).
+    /// Liste les disques et leurs tables de partitions.
     List(Target),
-    /// Analyse a disk: partition table, structure check and Quick Search.
+    /// Analyse un disque : table de partitions, vérification de la structure et recherche rapide.
     Analyse(Target),
 }
 
@@ -68,7 +68,12 @@ fn run(cli: Cli) -> Result<(), String> {
                 .create(true)
                 .append(true)
                 .open(p)
-                .map_err(|e| format!("cannot open log file {}: {e}", p.display()))?,
+                .map_err(|e| {
+                    format!(
+                        "impossible d'ouvrir le fichier journal {} : {e}",
+                        p.display()
+                    )
+                })?,
         ),
         None => None,
     };
@@ -78,11 +83,11 @@ fn run(cli: Cli) -> Result<(), String> {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     out.line(&format!(
-        "diskrust {} (read-only) - unix time {secs}",
+        "diskrust {} (lecture seule) - heure unix {secs}",
         env!("CARGO_PKG_VERSION")
     ));
     out.line(&format!(
-        "Command line: {}",
+        "Ligne de commande : {}",
         std::env::args().collect::<Vec<_>>().join(" ")
     ));
 
@@ -95,21 +100,22 @@ fn run(cli: Cli) -> Result<(), String> {
     match (&target.image, &target.device) {
         (None, None) => {
             if analyse {
-                return Err("analyse needs --image FILE or a DEVICE".to_string());
+                return Err("analyse nécessite --image FICHIER ou un PÉRIPHÉRIQUE".to_string());
             }
             for d in enumerate_disks() {
                 match PhysicalDisk::open(&d.path) {
                     Ok(dev) => targets.push((d.path, Box::new(dev))),
-                    Err(e) => out.line(&format!("Disk {} - cannot open: {e}", d.path)),
+                    Err(e) => out.line(&format!("Disque {} - ouverture impossible : {e}", d.path)),
                 }
             }
             if targets.is_empty() {
-                out.line("No readable disk found (try running with elevated privileges).");
+                out.line("Aucun disque lisible trouvé (essayez avec des privilèges élevés).");
             }
         }
         (img, dev) => {
             let dev = dev.clone().unwrap_or_default();
-            targets.push(open(img, &dev).map_err(|e| format!("cannot open target: {e}"))?);
+            targets
+                .push(open(img, &dev).map_err(|e| format!("impossible d'ouvrir la cible : {e}"))?);
         }
     }
 
@@ -118,7 +124,7 @@ fn run(cli: Cli) -> Result<(), String> {
         let lines = if analyse {
             dr_cli::analyse_report(label, dev.as_ref(), &mut |p| {
                 if tty {
-                    eprint!("\rQuick Search: {:>3}%", p.percent());
+                    eprint!("\rRecherche rapide : {:>3} %", p.percent());
                 }
             })
         } else {

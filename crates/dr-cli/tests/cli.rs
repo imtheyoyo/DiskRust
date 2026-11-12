@@ -28,8 +28,8 @@ fn list_prints_table() {
     let out = bin().arg("list").arg("--image").arg(&img).output().unwrap();
     assert!(out.status.success());
     let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("bytes/sector"), "{s}");
-    assert!(s.contains("Partition table type: Intel"), "{s}");
+    assert!(s.contains("octets/secteur"), "{s}");
+    assert!(s.contains("Type de table de partitions : Intel"), "{s}");
     assert!(s.contains("[FAT32]") && s.contains("[NTFS]"), "{s}");
 }
 
@@ -51,11 +51,11 @@ fn analyse_reports_structure_and_log() {
         String::from_utf8_lossy(&out.stderr)
     );
     let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("Structure: Ok"), "{s}");
-    assert!(s.contains("Quick Search found 2"), "{s}");
-    assert!(s.contains("(in partition table)"), "{s}");
+    assert!(s.contains("Structure : Ok"), "{s}");
+    assert!(s.contains("La recherche rapide a trouvé 2"), "{s}");
+    assert!(s.contains("(dans la table de partitions)"), "{s}");
     let logged = std::fs::read_to_string(&log).unwrap();
-    assert!(logged.contains("Structure: Ok") && logged.contains("read-only"));
+    assert!(logged.contains("Structure : Ok") && logged.contains("lecture seule"));
 }
 
 #[test]
@@ -72,8 +72,8 @@ fn analyse_flags_missing_table() {
         .output()
         .unwrap();
     let s = String::from_utf8_lossy(&out.stdout);
-    assert!(s.contains("Partition table type: None"), "{s}");
-    assert!(s.contains("recovery candidate"), "{s}");
+    assert!(s.contains("Type de table de partitions : Aucune"), "{s}");
+    assert!(s.contains("candidat à la récupération"), "{s}");
 }
 
 #[test]

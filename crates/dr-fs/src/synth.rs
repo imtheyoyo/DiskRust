@@ -1,4 +1,4 @@
-//! Builders for synthetic boot sectors / superblocks (used by tests in this workspace).
+//! Constructeurs de secteurs de démarrage et superblocs synthétiques (utilisés par les tests de ce workspace).
 
 use crate::FsKind;
 
@@ -20,7 +20,7 @@ fn label11(s: &mut [u8], off: usize, label: &str) {
     s[off..off + 11].copy_from_slice(&l);
 }
 
-/// 1.44 MB floppy-style FAT12 boot sector.
+/// Secteur de démarrage FAT12 de type disquette 1,44 Mo.
 pub fn fat12_boot_sector() -> [u8; 512] {
     let mut s = base(true);
     s[3..11].copy_from_slice(b"MSDOS5.0");
@@ -38,7 +38,7 @@ pub fn fat12_boot_sector() -> [u8; 512] {
     s
 }
 
-/// FAT16 boot sector for a 40000-sector volume.
+/// Secteur de démarrage FAT16 pour un volume de 40000 secteurs.
 pub fn fat16_boot_sector() -> [u8; 512] {
     let mut s = base(true);
     s[3..11].copy_from_slice(b"MSDOS5.0");
@@ -56,8 +56,8 @@ pub fn fat16_boot_sector() -> [u8; 512] {
     s
 }
 
-/// FAT32 boot sector with 512-byte clusters. `total_sectors` must be >= ~66000
-/// so that the cluster count reaches the FAT32 threshold.
+/// Secteur de démarrage FAT32 avec des clusters de 512 octets. `total_sectors` doit être >= ~66000
+/// pour que le nombre de clusters atteigne le seuil FAT32.
 pub fn fat32_boot_sector(total_sectors: u32) -> [u8; 512] {
     let mut s = base(true);
     s[3..11].copy_from_slice(b"MSWIN4.1");
@@ -78,7 +78,7 @@ pub fn fat32_boot_sector(total_sectors: u32) -> [u8; 512] {
     s
 }
 
-/// NTFS boot sector (512-byte sectors, 4 KiB clusters).
+/// Secteur de démarrage NTFS (secteurs de 512 octets, clusters de 4 Kio).
 pub fn ntfs_boot_sector(total_sectors: u64, mft_lcn: u64) -> [u8; 512] {
     let mut s = base(false);
     s[0..3].copy_from_slice(&[0xEB, 0x52, 0x90]);
@@ -89,13 +89,13 @@ pub fn ntfs_boot_sector(total_sectors: u64, mft_lcn: u64) -> [u8; 512] {
     s[40..48].copy_from_slice(&total_sectors.to_le_bytes());
     s[48..56].copy_from_slice(&mft_lcn.to_le_bytes());
     s[56..64].copy_from_slice(&(total_sectors / 16).to_le_bytes());
-    s[64] = 0xF6; // -10 => 1024-byte MFT records
+    s[64] = 0xF6; // -10 => enregistrements MFT de 1024 octets
     s[68] = 1;
     s[72..80].copy_from_slice(&0x1122_3344_5566_7788u64.to_le_bytes());
     s
 }
 
-/// exFAT boot sector (512-byte sectors, 4 KiB clusters).
+/// Secteur de démarrage exFAT (secteurs de 512 octets, clusters de 4 Kio).
 pub fn exfat_boot_sector(volume_sectors: u64) -> [u8; 512] {
     let mut s = base(false);
     s[0..3].copy_from_slice(&[0xEB, 0x76, 0x90]);
@@ -106,22 +106,22 @@ pub fn exfat_boot_sector(volume_sectors: u64) -> [u8; 512] {
     s[88..92].copy_from_slice(&256u32.to_le_bytes());
     s[92..96].copy_from_slice(&((volume_sectors / 8) as u32).to_le_bytes());
     s[96..100].copy_from_slice(&4u32.to_le_bytes());
-    s[108] = 9; // 512-byte sectors
-    s[109] = 3; // 8 sectors per cluster
+    s[108] = 9; // secteurs de 512 octets
+    s[109] = 3; // 8 secteurs par cluster
     s[110] = 1;
     s
 }
 
-/// A 1024-byte ext superblock (to be placed 1024 bytes into the volume).
+/// Superbloc ext de 1024 octets (à placer 1024 octets après le début du volume).
 pub fn ext_superblock(kind: FsKind, blocks: u32, label: &str) -> [u8; 1024] {
     let mut sb = [0u8; 1024];
     sb[0..4].copy_from_slice(&(blocks / 4).to_le_bytes()); // inodes
     sb[4..8].copy_from_slice(&blocks.to_le_bytes());
-    sb[24..28].copy_from_slice(&2u32.to_le_bytes()); // 4 KiB blocks
-    sb[32..36].copy_from_slice(&32768u32.to_le_bytes()); // blocks per group
+    sb[24..28].copy_from_slice(&2u32.to_le_bytes()); // blocs de 4 Kio
+    sb[32..36].copy_from_slice(&32768u32.to_le_bytes()); // blocs par groupe
     sb[56..58].copy_from_slice(&0xEF53u16.to_le_bytes());
     sb[58..60].copy_from_slice(&1u16.to_le_bytes());
-    sb[76..80].copy_from_slice(&1u32.to_le_bytes()); // dynamic rev
+    sb[76..80].copy_from_slice(&1u32.to_le_bytes()); // révision dynamique
     let (compat, incompat, ro) = match kind {
         FsKind::Ext2 => (0x38u32, 0x2u32, 0x1u32),
         FsKind::Ext3 => (0x3C, 0x2, 0x1),

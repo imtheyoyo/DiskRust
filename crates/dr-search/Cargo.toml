@@ -1,6 +1,6 @@
 [package]
 name = "dr-search"
-description = "Quick Search: locate filesystems on a disk and sanity-check partition layouts"
+description = "Recherche rapide : localise les systèmes de fichiers d'un disque et vérifie la cohérence des schémas de partitions"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "dr-part"
-description = "MBR/EBR and GPT partition table parsers"
+description = "Analyseurs de tables de partitions MBR/EBR et GPT"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

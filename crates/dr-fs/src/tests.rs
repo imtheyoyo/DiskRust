@@ -38,7 +38,7 @@ fn fat_types_by_cluster_count() {
 #[test]
 fn fat_rejects_garbage() {
     let mut s = fat32_boot_sector(70_000);
-    s[11..13].copy_from_slice(&1000u16.to_le_bytes()); // bytes/sector not a power of two
+    s[11..13].copy_from_slice(&1000u16.to_le_bytes()); // octets/secteur n'est pas une puissance de deux
     assert!(detect_fat(&s, 512).is_none());
     let mut s = fat32_boot_sector(70_000);
     s[510] = 0;
@@ -55,12 +55,12 @@ fn ntfs_detected() {
     let i = probe(&with_boot(&s, 2048, 512 * 4096), 2048).unwrap();
     assert_eq!(i.kind, FsKind::Ntfs);
     assert_eq!(i.block_size, 4096);
-    assert_eq!(i.size_sectors, 100_001); // + backup boot sector
+    assert_eq!(i.size_sectors, 100_001); // + secteur de démarrage de secours
     let mut bad = s;
-    bad[14] = 1; // reserved sectors must be zero
+    bad[14] = 1; // les secteurs réservés doivent être nuls
     assert!(detect_ntfs(&bad, 512).is_none());
     let mut bad = s;
-    bad[48..56].copy_from_slice(&u64::MAX.to_le_bytes()); // MFT outside volume
+    bad[48..56].copy_from_slice(&u64::MAX.to_le_bytes()); // MFT hors du volume
     assert!(detect_ntfs(&bad, 512).is_none());
 }
 
@@ -82,7 +82,7 @@ fn exfat_detected() {
         (FsKind::ExFat, 4096, 65_536)
     );
     let mut bad = s;
-    bad[20] = 1; // MustBeZero violated
+    bad[20] = 1; // MustBeZero violé
     assert!(detect_exfat(&bad, 512).is_none());
 }
 
@@ -109,5 +109,5 @@ fn ext_variants() {
 #[test]
 fn blank_disk_has_no_fs() {
     assert!(probe(&MemImage::zeroed(512 * 64), 0).is_none());
-    assert!(probe(&MemImage::zeroed(512 * 64), 1000).is_none()); // out of range
+    assert!(probe(&MemImage::zeroed(512 * 64), 1000).is_none()); // hors limites
 }

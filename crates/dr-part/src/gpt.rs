@@ -1,4 +1,4 @@
-//! GPT parsing with CRC validation and backup-header fallback.
+//! Analyse GPT avec validation CRC et repli sur l'en-tête de secours.
 
 use std::fmt;
 
@@ -12,102 +12,102 @@ const MIN_HEADER_SIZE: u32 = 92;
 const MAX_ENTRIES: u32 = 4096;
 const MAX_ENTRIES_BYTES: u64 = 4 * 1024 * 1024;
 
-/// A parsed, validated GPT header.
+/// En-tête GPT analysé et validé.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GptHeader {
-    /// Revision (0x00010000 for 1.0).
+    /// Révision (0x00010000 pour 1.0).
     pub revision: u32,
-    /// Header size in bytes.
+    /// Taille de l'en-tête en octets.
     pub header_size: u32,
-    /// CRC32 of the header as stored.
+    /// CRC32 de l'en-tête tel que stocké.
     pub header_crc: u32,
-    /// LBA of this header.
+    /// LBA de cet en-tête.
     pub my_lba: u64,
-    /// LBA of the other header.
+    /// LBA de l'autre en-tête.
     pub alternate_lba: u64,
-    /// First LBA usable by partitions.
+    /// Premier LBA utilisable par les partitions.
     pub first_usable: u64,
-    /// Last LBA usable by partitions.
+    /// Dernier LBA utilisable par les partitions.
     pub last_usable: u64,
-    /// Disk GUID (raw bytes).
+    /// GUID du disque (octets bruts).
     pub disk_guid: [u8; 16],
-    /// Start LBA of the entry array.
+    /// LBA de début du tableau d'entrées.
     pub entries_lba: u64,
-    /// Number of entries.
+    /// Nombre d'entrées.
     pub num_entries: u32,
-    /// Size of one entry.
+    /// Taille d'une entrée.
     pub entry_size: u32,
-    /// CRC32 of the entry array as stored.
+    /// CRC32 du tableau d'entrées tel que stocké.
     pub entries_crc: u32,
 }
 
-/// Things that can be wrong with a GPT.
+/// Anomalies possibles d'une GPT.
 #[derive(Debug)]
 pub enum GptError {
-    /// I/O failure while reading.
+    /// Échec d'E/S pendant la lecture.
     Io(std::io::Error),
-    /// Signature is not "EFI PART".
+    /// La signature n'est pas « EFI PART ».
     BadSignature,
-    /// Header size field out of range.
+    /// Champ de taille d'en-tête hors limites.
     BadHeaderSize(u32),
-    /// Header CRC32 mismatch.
+    /// CRC32 de l'en-tête incorrect.
     BadHeaderChecksum {
-        /// Value in the header.
+        /// Valeur présente dans l'en-tête.
         stored: u32,
-        /// Value we computed.
+        /// Valeur calculée.
         computed: u32,
     },
-    /// `my_lba` does not equal the LBA the header was read from.
+    /// `my_lba` ne correspond pas au LBA d'où l'en-tête a été lu.
     BadCurrentLba {
-        /// Value in the header.
+        /// Valeur présente dans l'en-tête.
         found: u64,
-        /// LBA read from.
+        /// LBA de lecture.
         expected: u64,
     },
-    /// Entry size is not a power of two >= 128.
+    /// La taille d'entrée n'est pas une puissance de deux >= 128.
     BadEntrySize(u32),
-    /// Entry count is zero or unreasonably large.
+    /// Le nombre d'entrées est nul ou démesuré.
     BadEntryCount(u32),
-    /// Entry array does not fit on the disk.
+    /// Le tableau d'entrées ne tient pas sur le disque.
     EntriesOutOfRange,
-    /// Entry array CRC32 mismatch.
+    /// CRC32 du tableau d'entrées incorrect.
     BadEntriesChecksum {
-        /// Value in the header.
+        /// Valeur présente dans l'en-tête.
         stored: u32,
-        /// Value we computed.
+        /// Valeur calculée.
         computed: u32,
     },
 }
 
 impl fmt::Display for GptError {
-    // Messages describe each GPT validation failure in plain terms.
+    // Les messages décrivent chaque échec de validation GPT en termes simples.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GptError::Io(e) => write!(f, "Bad GPT partition, read error: {e}"),
-            GptError::BadSignature => f.write_str("Bad GPT partition, invalid signature."),
+            GptError::Io(e) => write!(f, "Partition GPT invalide, erreur de lecture : {e}"),
+            GptError::BadSignature => f.write_str("Partition GPT invalide, signature incorrecte."),
             GptError::BadHeaderSize(s) => {
-                write!(f, "Bad GPT partition, invalid header size ({s}).")
+                write!(f, "Partition GPT invalide, taille d'en-tête incorrecte ({s}).")
             }
             GptError::BadHeaderChecksum { stored, computed } => write!(
                 f,
-                "Bad GPT partition, invalid header checksum (stored {stored:#010x}, computed {computed:#010x})."
+                "Partition GPT invalide, somme de contrôle de l'en-tête incorrecte (stockée {stored:#010x}, calculée {computed:#010x})."
             ),
             GptError::BadCurrentLba { found, expected } => write!(
                 f,
-                "Bad GPT partition, invalid current LBA ({found}, expected {expected})."
+                "Partition GPT invalide, LBA courant incorrect ({found}, attendu {expected})."
             ),
             GptError::BadEntrySize(s) => {
-                write!(f, "Bad GPT partition, invalid partition entry size ({s}).")
+                write!(f, "Partition GPT invalide, taille d'entrée de partition incorrecte ({s}).")
             }
             GptError::BadEntryCount(n) => {
-                write!(f, "Bad GPT partition, invalid number of entries ({n}).")
+                write!(f, "Partition GPT invalide, nombre d'entrées incorrect ({n}).")
             }
             GptError::EntriesOutOfRange => {
-                f.write_str("Bad GPT partition, entry array lies outside the disk.")
+                f.write_str("Partition GPT invalide, le tableau d'entrées est en dehors du disque.")
             }
             GptError::BadEntriesChecksum { stored, computed } => write!(
                 f,
-                "Bad GPT partition, invalid partition entries checksum (stored {stored:#010x}, computed {computed:#010x})."
+                "Partition GPT invalide, somme de contrôle des entrées de partition incorrecte (stockée {stored:#010x}, calculée {computed:#010x})."
             ),
         }
     }
@@ -121,16 +121,16 @@ impl From<std::io::Error> for GptError {
     }
 }
 
-/// Result of [`parse_gpt`].
+/// Résultat de [`parse_gpt`].
 #[derive(Debug, Clone)]
 pub struct GptTable {
-    /// The header that was accepted.
+    /// L'en-tête qui a été accepté.
     pub header: GptHeader,
-    /// Non-empty partitions.
+    /// Partitions non vides.
     pub partitions: Vec<Partition>,
-    /// Diagnostics, including the primary header failure when the backup was used.
+    /// Diagnostics, y compris l'échec de l'en-tête primaire lorsque la copie de secours a été utilisée.
     pub warnings: Vec<String>,
-    /// True when the primary GPT was bad and the backup at the last LBA was used.
+    /// Vrai lorsque la GPT primaire était invalide et que la copie de secours au dernier LBA a été utilisée.
     pub used_backup: bool,
 }
 
@@ -142,7 +142,7 @@ fn u64_at(b: &[u8], o: usize) -> u64 {
 }
 
 impl GptHeader {
-    /// Parse and validate (signature, size, CRC32) a header from a sector.
+    /// Analyse et valide (signature, taille, CRC32) un en-tête à partir d'un secteur.
     pub fn parse(sector: &[u8]) -> Result<Self, GptError> {
         if sector.len() < MIN_HEADER_SIZE as usize || &sector[0..8] != GPT_SIGNATURE {
             return Err(GptError::BadSignature);
@@ -217,7 +217,10 @@ fn load_gpt_at(
     let mut warnings = Vec::new();
     let mut parts = Vec::new();
     if header.first_usable > header.last_usable {
-        warnings.push("GPT header: first usable LBA is after last usable LBA".to_string());
+        warnings.push(
+            "En-tête GPT : le premier LBA utilisable est postérieur au dernier LBA utilisable"
+                .to_string(),
+        );
     }
     for (i, e) in buf.chunks_exact(header.entry_size as usize).enumerate() {
         if e[0..16].iter().all(|&b| b == 0) {
@@ -230,7 +233,7 @@ fn load_gpt_at(
         let attrs = u64_at(e, 48);
         if last < first || first < header.first_usable || last > header.last_usable {
             warnings.push(format!(
-                "GPT partition {}: range {first}-{last} is invalid or outside usable area {}-{}",
+                "Partition GPT {} : la plage {first}-{last} est invalide ou hors de la zone utilisable {}-{}",
                 i + 1,
                 header.first_usable,
                 header.last_usable
@@ -256,8 +259,8 @@ fn load_gpt_at(
     Ok((header, parts, warnings))
 }
 
-/// Parse the GPT: primary header at LBA 1, falling back to the backup at the
-/// last LBA of the disk when the primary is invalid.
+/// Analyse la GPT : en-tête primaire au LBA 1, avec repli sur la copie de secours
+/// au dernier LBA du disque lorsque la primaire est invalide.
 pub fn parse_gpt(dev: &dyn BlockDevice) -> Result<GptTable, PartError> {
     let mut log = Vec::new();
     match load_gpt_at(dev, 1) {
@@ -273,13 +276,13 @@ pub fn parse_gpt(dev: &dyn BlockDevice) -> Result<GptTable, PartError> {
         }
         Err(e) => log.push(e.to_string()),
     }
-    log.push("Trying alternate GPT".to_string());
+    log.push("Tentative avec la GPT de secours".to_string());
     let last = dev.sector_count().saturating_sub(1);
     if last > 1 {
         match load_gpt_at(dev, last) {
             Ok((header, partitions, mut w)) => {
                 let mut warnings = log;
-                warnings.push("Using backup GPT header".to_string());
+                warnings.push("Utilisation de l'en-tête GPT de secours".to_string());
                 warnings.append(&mut w);
                 return Ok(GptTable {
                     header,
@@ -288,13 +291,13 @@ pub fn parse_gpt(dev: &dyn BlockDevice) -> Result<GptTable, PartError> {
                     used_backup: true,
                 });
             }
-            Err(e) => log.push(format!("Alternate GPT: {e}")),
+            Err(e) => log.push(format!("GPT de secours : {e}")),
         }
     }
     Err(PartError::NoValidGpt(log))
 }
 
-/// Format 16 raw (mixed-endian) GUID bytes as `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`.
+/// Formate 16 octets bruts (mixed-endian) de GUID sous la forme `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`.
 pub fn format_guid(b: &[u8; 16]) -> String {
     format!(
         "{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
@@ -312,7 +315,7 @@ pub fn format_guid(b: &[u8; 16]) -> String {
     )
 }
 
-/// Parse the textual GUID form into raw mixed-endian bytes.
+/// Convertit la forme textuelle d'un GUID en octets bruts mixed-endian.
 pub fn parse_guid(s: &str) -> Option<[u8; 16]> {
     let parts: Vec<&str> = s.split('-').collect();
     let lens = [8, 4, 4, 4, 12];
@@ -367,7 +370,7 @@ const GPT_TYPES: &[(&str, &str)] = &[
     ("7C3457EF-0000-11AA-AA11-00306543ECAC", "Apple APFS"),
 ];
 
-/// Name of a well-known GPT partition type GUID.
+/// Nom d'un GUID de type de partition GPT bien connu.
 pub fn gpt_type_name(guid: &[u8; 16]) -> Option<&'static str> {
     let s = format_guid(guid);
     GPT_TYPES.iter().find(|(g, _)| *g == s).map(|(_, n)| *n)

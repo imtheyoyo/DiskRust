@@ -1,7 +1,8 @@
-//! "Quick Search": scan cylinder- and MiB-aligned sectors for filesystem
-//! boot sectors, and sanity-check partition layouts.
+//! « Recherche rapide » : analyse les secteurs alignés sur les cylindres et sur
+//! 1 Mio à la recherche de secteurs de démarrage de systèmes de fichiers, et
+//! vérifie la cohérence des schémas de partitions.
 //!
-//! Strictly read-only.
+//! Strictement en lecture seule.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -10,16 +11,16 @@ use dr_disk::BlockDevice;
 use dr_fs::probe;
 use dr_part::{PartKind, Partition, TypeId};
 
-/// Search parameters.
+/// Paramètres de recherche.
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
-    /// Translation geometry: heads per cylinder.
+    /// Géométrie de traduction : têtes par cylindre.
     pub heads: u32,
-    /// Translation geometry: sectors per track.
+    /// Géométrie de traduction : secteurs par piste.
     pub sectors_per_track: u32,
-    /// Probe every cylinder boundary (and LBA `sectors_per_track`, the classic first partition).
+    /// Sonde chaque frontière de cylindre (et le LBA `sectors_per_track`, la première partition classique).
     pub scan_cylinders: bool,
-    /// Probe every 1 MiB boundary (modern alignment).
+    /// Sonde chaque frontière de 1 Mio (alignement moderne).
     pub scan_mib: bool,
 }
 
@@ -34,19 +35,19 @@ impl Default for SearchOptions {
     }
 }
 
-/// Progress report passed to the callback.
+/// Rapport de progression transmis au rappel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Progress {
-    /// Sector currently being examined.
+    /// Secteur actuellement examiné.
     pub current_lba: u64,
-    /// Total sectors on the device.
+    /// Nombre total de secteurs du périphérique.
     pub total_lba: u64,
-    /// Partitions found so far.
+    /// Partitions trouvées jusqu'ici.
     pub found: usize,
 }
 
 impl Progress {
-    /// Completion in percent (0..=100).
+    /// Avancement en pourcentage (0..=100).
     pub fn percent(&self) -> u64 {
         (self.current_lba.min(self.total_lba) * 100)
             .checked_div(self.total_lba)
@@ -79,10 +80,10 @@ fn candidate_lbas(dev: &dyn BlockDevice, opts: &SearchOptions) -> BTreeSet<u64> 
     set
 }
 
-/// Scan for filesystems and return candidate partitions in LBA order.
+/// Recherche des systèmes de fichiers et renvoie les partitions candidates dans l'ordre des LBA.
 ///
-/// Once a filesystem is found, scanning resumes after its end so nested
-/// false positives are not reported.
+/// Dès qu'un système de fichiers est trouvé, l'analyse reprend après sa fin
+/// afin de ne pas signaler de faux positifs imbriqués.
 pub fn quick_search(
     dev: &dyn BlockDevice,
     opts: &SearchOptions,
@@ -125,9 +126,10 @@ pub fn quick_search(
     found
 }
 
-/// TODO: search for ext2/3/4 backup superblocks (at block group 1, 3, 5, 7, 9,
-/// 25, 27 ...) to recover ext partitions whose primary superblock is lost.
-/// Not implemented yet; always returns an empty list.
+/// TODO : rechercher les superblocs de sauvegarde ext2/3/4 (aux groupes de blocs
+/// 1, 3, 5, 7, 9, 25, 27 ...) pour récupérer les partitions ext dont le
+/// superbloc principal est perdu. Pas encore implémenté ; renvoie toujours une
+/// liste vide.
 pub fn search_ext_backup_superblocks(
     _dev: &dyn BlockDevice,
     _progress: &mut dyn FnMut(&Progress),
@@ -135,36 +137,36 @@ pub fn search_ext_backup_superblocks(
     Vec::new()
 }
 
-/// A problem with a partition layout.
+/// Un problème dans un schéma de partitions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StructureIssue {
-    /// Partition has zero length.
+    /// La partition a une taille nulle.
     ZeroSize {
-        /// Index in the input slice.
+        /// Indice dans la tranche d'entrée.
         index: usize,
     },
-    /// Partition starts before the previous one.
+    /// La partition commence avant la précédente.
     OutOfOrder {
-        /// Index in the input slice.
+        /// Indice dans la tranche d'entrée.
         index: usize,
     },
-    /// Two partitions overlap (extended containers and their logicals excepted).
+    /// Deux partitions se chevauchent (hors conteneurs étendus et leurs partitions logiques).
     Overlap {
-        /// First partition index.
+        /// Indice de la première partition.
         a: usize,
-        /// Second partition index.
+        /// Indice de la seconde partition.
         b: usize,
     },
-    /// More than four primary/extended entries.
+    /// Plus de quatre entrées primaires/étendues.
     TooManyPrimaries(usize),
-    /// A logical partition is not inside any extended partition.
+    /// Une partition logique ne se trouve dans aucune partition étendue.
     LogicalOutsideExtended {
-        /// Index in the input slice.
+        /// Indice dans la tranche d'entrée.
         index: usize,
     },
-    /// Partition extends past the end of the disk.
+    /// La partition dépasse la fin du disque.
     BeyondDisk {
-        /// Index in the input slice.
+        /// Indice dans la tranche d'entrée.
         index: usize,
     },
 }
@@ -173,59 +175,55 @@ impl fmt::Display for StructureIssue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StructureIssue::ZeroSize { index } => {
-                write!(f, "partition {} has zero size", index + 1)
+                write!(f, "la partition {} a une taille nulle", index + 1)
             }
             StructureIssue::OutOfOrder { index } => {
                 write!(
                     f,
-                    "partition {} starts before the previous partition",
+                    "la partition {} commence avant la partition précédente",
                     index + 1
                 )
             }
             StructureIssue::Overlap { a, b } => {
-                write!(f, "partitions {} and {} overlap", a + 1, b + 1)
+                write!(f, "les partitions {} et {} se chevauchent", a + 1, b + 1)
             }
             StructureIssue::TooManyPrimaries(n) => {
-                write!(f, "{n} primary/extended partitions (maximum is 4)")
+                write!(f, "{n} partitions primaires/étendues (maximum : 4)")
             }
             StructureIssue::LogicalOutsideExtended { index } => {
                 write!(
                     f,
-                    "logical partition {} is outside any extended partition",
+                    "la partition logique {} est en dehors de toute partition étendue",
                     index + 1
                 )
             }
             StructureIssue::BeyondDisk { index } => {
-                write!(
-                    f,
-                    "partition {} extends beyond the end of the disk",
-                    index + 1
-                )
+                write!(f, "la partition {} dépasse la fin du disque", index + 1)
             }
         }
     }
 }
 
-/// Result of [`check_structure`].
+/// Résultat de [`check_structure`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StructureReport {
-    /// All problems found.
+    /// Tous les problèmes trouvés.
     pub issues: Vec<StructureIssue>,
 }
 
 impl StructureReport {
-    /// True when the layout has no problems ("Structure: Ok").
+    /// Vrai lorsque le schéma ne présente aucun problème (« Structure : Ok »).
     pub fn is_ok(&self) -> bool {
         self.issues.is_empty()
     }
 }
 
-/// Check ordering, overlaps and MBR container rules of a partition list.
+/// Vérifie l'ordre, les chevauchements et les règles de conteneurs MBR d'une liste de partitions.
 pub fn check_structure(parts: &[Partition]) -> StructureReport {
     check_structure_on_disk(parts, None)
 }
 
-/// Like [`check_structure`], additionally verifying that nothing ends past `disk_sectors`.
+/// Comme [`check_structure`], en vérifiant en plus que rien ne dépasse `disk_sectors`.
 pub fn check_structure_on_disk(parts: &[Partition], disk_sectors: Option<u64>) -> StructureReport {
     let mut issues = Vec::new();
     for (i, p) in parts.iter().enumerate() {

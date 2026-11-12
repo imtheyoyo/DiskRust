@@ -1,9 +1,9 @@
-//! Filesystem signature detection from boot sectors / superblocks.
+//! Détection de signatures de systèmes de fichiers à partir des secteurs de démarrage et des superblocs.
 //!
-//! Only on-disk structure *signatures and geometry fields* are inspected;
-//! no filesystem is mounted or walked. Implemented from the public
-//! Microsoft FAT/exFAT specifications, the NTFS boot sector layout and the
-//! ext2/3/4 on-disk format documentation.
+//! Seuls les *signatures et champs de géométrie* des structures sur disque sont
+//! inspectés ; aucun système de fichiers n'est monté ni parcouru. Implémenté à
+//! partir des spécifications publiques Microsoft FAT/exFAT, de la disposition du
+//! secteur de démarrage NTFS et de la documentation du format sur disque ext2/3/4.
 
 use std::fmt;
 
@@ -12,7 +12,7 @@ use dr_disk::BlockDevice;
 #[doc(hidden)]
 pub mod synth;
 
-/// Detected filesystem family.
+/// Famille de système de fichiers détectée.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsKind {
     /// FAT12
@@ -49,7 +49,7 @@ impl fmt::Display for FsKind {
 }
 
 impl FsKind {
-    /// A reasonable MBR system id for this filesystem.
+    /// Identifiant système MBR raisonnable pour ce système de fichiers.
     pub fn mbr_type(self) -> u8 {
         match self {
             FsKind::Fat12 => 0x01,
@@ -61,16 +61,16 @@ impl FsKind {
     }
 }
 
-/// What was learned about a filesystem.
+/// Informations obtenues sur un système de fichiers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FsInfo {
-    /// Filesystem family.
+    /// Famille de système de fichiers.
     pub kind: FsKind,
-    /// Allocation unit (cluster / block) in bytes.
+    /// Unité d'allocation (cluster / bloc) en octets.
     pub block_size: u32,
-    /// Volume size in *device* sectors.
+    /// Taille du volume en secteurs *du périphérique*.
     pub size_sectors: u64,
-    /// Volume label, if present in the boot sector / superblock.
+    /// Étiquette du volume, si présente dans le secteur de démarrage / superbloc.
     pub label: Option<String>,
 }
 
@@ -112,8 +112,8 @@ fn to_dev_sectors(bytes: u64, dev_ss: u32) -> u64 {
     bytes / u64::from(dev_ss.max(1))
 }
 
-/// Validate a FAT12/16/32 BPB (first sector of the volume) and classify it
-/// by cluster count, as the Microsoft specification prescribes.
+/// Valide un BPB FAT12/16/32 (premier secteur du volume) et le classe selon
+/// le nombre de clusters, comme le prescrit la spécification Microsoft.
 pub fn detect_fat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     if !has_boot_sig(sector) {
         return None;
@@ -151,7 +151,7 @@ pub fn detect_fat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     }
     let is32_layout = fat16 == 0;
     if is32_layout {
-        // FAT32: no fixed root directory, root cluster >= 2.
+        // FAT32 : pas de répertoire racine fixe, cluster racine >= 2.
         if root_entries != 0 || le32(sector, 44) < 2 {
             return None;
         }
@@ -173,7 +173,7 @@ pub fn detect_fat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     } else {
         FsKind::Fat32
     };
-    // The layout must agree with the type derived from the cluster count.
+    // La disposition doit concorder avec le type déduit du nombre de clusters.
     if (kind == FsKind::Fat32) != is32_layout {
         return None;
     }
@@ -194,8 +194,8 @@ pub fn detect_fat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     })
 }
 
-/// Validate an NTFS boot sector. The reported size includes the backup boot
-/// sector stored in the last sector of the volume (not counted by `$Boot`).
+/// Valide un secteur de démarrage NTFS. La taille rapportée inclut le secteur de
+/// démarrage de secours stocké dans le dernier secteur du volume (non compté par `$Boot`).
 pub fn detect_ntfs(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     if !has_boot_sig(sector) || &sector[3..11] != b"NTFS    " {
         return None;
@@ -205,7 +205,7 @@ pub fn detect_ntfs(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     let spc = if spc_raw <= 0x80 {
         u32::from(spc_raw)
     } else {
-        // values > 0x80 encode 2^(256 - x)
+        // les valeurs > 0x80 codent 2^(256 - x)
         let shift = 256 - u32::from(spc_raw);
         if shift > 12 {
             return None;
@@ -219,7 +219,7 @@ pub fn detect_ntfs(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
         return None;
     }
     if le16(sector, 14) != 0 || sector[16] != 0 || le16(sector, 17) != 0 || le16(sector, 19) != 0 {
-        return None; // must be zero on NTFS
+        return None; // doit être nul sur NTFS
     }
     let total = le64(sector, 40);
     let mft_lcn = le64(sector, 48);
@@ -239,13 +239,13 @@ pub fn detect_ntfs(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     })
 }
 
-/// Validate an exFAT main boot sector.
+/// Valide le secteur de démarrage principal exFAT.
 pub fn detect_exfat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     if !has_boot_sig(sector) || &sector[3..11] != b"EXFAT   " {
         return None;
     }
     if sector[11..64].iter().any(|&b| b != 0) {
-        return None; // MustBeZero region
+        return None; // région MustBeZero
     }
     let bps_shift = u32::from(sector[108]);
     let spc_shift = u32::from(sector[109]);
@@ -272,7 +272,7 @@ pub fn detect_exfat(sector: &[u8], dev_ss: u32) -> Option<FsInfo> {
     })
 }
 
-/// Validate an ext2/3/4 superblock (the 1024 bytes located 1024 bytes into the volume).
+/// Valide un superbloc ext2/3/4 (les 1024 octets situés 1024 octets après le début du volume).
 pub fn detect_ext(sb: &[u8], dev_ss: u32) -> Option<FsInfo> {
     if sb.len() < 1024 || le16(sb, 56) != 0xEF53 {
         return None;
@@ -290,11 +290,11 @@ pub fn detect_ext(sb: &[u8], dev_ss: u32) -> Option<FsInfo> {
         blocks_lo
     };
     if blocks == 0 || le32(sb, 0) == 0 || le32(sb, 32) == 0 {
-        return None; // no inodes / no blocks per group
+        return None; // aucun inode / aucun bloc par groupe
     }
     let compat = le32(sb, 92);
     let ro_compat = le32(sb, 100);
-    // Same feature-based distinction the Linux kernel uses.
+    // Même distinction par fonctionnalités que celle du noyau Linux.
     const EXT3_INCOMPAT: u32 = 0x4 | 0x8; // RECOVER | JOURNAL_DEV
     const EXT4_INCOMPAT: u32 = 0x40 | 0x80 | 0x200 | 0x400 | 0x1000 | 0x2000; // EXTENTS 64BIT FLEX_BG EA_INODE DIRDATA/MMP-class
     const EXT4_RO_COMPAT: u32 = 0x8 | 0x10 | 0x20 | 0x40; // HUGE_FILE GDT_CSUM DIR_NLINK EXTRA_ISIZE
@@ -313,7 +313,7 @@ pub fn detect_ext(sb: &[u8], dev_ss: u32) -> Option<FsInfo> {
     })
 }
 
-/// Probe for a filesystem whose first sector is `start_lba`.
+/// Recherche un système de fichiers dont le premier secteur est `start_lba`.
 pub fn probe(dev: &dyn BlockDevice, start_lba: u64) -> Option<FsInfo> {
     let ss = dev.sector_size();
     let start = start_lba.checked_mul(u64::from(ss))?;
@@ -331,8 +331,8 @@ pub fn probe(dev: &dyn BlockDevice, start_lba: u64) -> Option<FsInfo> {
     detect_ext(&sb, ss)
 }
 
-/// Look for an NTFS *backup* boot sector in the last sector of a candidate
-/// volume (`last_lba`). On success `size_sectors` already accounts for it.
+/// Recherche un secteur de démarrage NTFS *de secours* dans le dernier secteur d'un
+/// volume candidat (`last_lba`). En cas de succès, `size_sectors` en tient déjà compte.
 pub fn probe_ntfs_backup(dev: &dyn BlockDevice, last_lba: u64) -> Option<FsInfo> {
     let ss = dev.sector_size();
     let sec = dev.read_sectors(last_lba, 1).ok()?;

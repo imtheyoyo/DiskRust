@@ -1,8 +1,8 @@
-//! Builders for synthetic partition tables (used by tests in this workspace).
+//! Constructeurs de tables de partitions synthétiques (utilisés par les tests de ce workspace).
 
 use crate::gpt::parse_guid;
 
-/// Encode an LBA as 3 CHS bytes using 255/63 geometry (saturating at 1023).
+/// Encode un LBA en 3 octets CHS avec la géométrie 255/63 (saturation à 1023).
 pub fn lba_to_chs(lba: u64) -> [u8; 3] {
     let (h, s) = (255u64, 63u64);
     let cyl = lba / (h * s);
@@ -18,7 +18,7 @@ pub fn lba_to_chs(lba: u64) -> [u8; 3] {
     ]
 }
 
-/// A 16-byte MBR partition entry with consistent CHS values.
+/// Entrée de partition MBR de 16 octets avec des valeurs CHS cohérentes.
 pub fn mbr_entry(boot: u8, type_id: u8, start: u32, size: u32) -> [u8; 16] {
     let mut e = [0u8; 16];
     e[0] = boot;
@@ -30,7 +30,7 @@ pub fn mbr_entry(boot: u8, type_id: u8, start: u32, size: u32) -> [u8; 16] {
     e
 }
 
-/// A 512-byte sector with up to four entries and the 0x55AA signature.
+/// Secteur de 512 octets avec jusqu'à quatre entrées et la signature 0x55AA.
 pub fn mbr_sector(entries: &[[u8; 16]]) -> [u8; 512] {
     let mut s = [0u8; 512];
     for (i, e) in entries.iter().take(4).enumerate() {
@@ -41,10 +41,10 @@ pub fn mbr_sector(entries: &[[u8; 16]]) -> [u8; 512] {
     s
 }
 
-/// One GPT partition to synthesise: (type GUID text, first LBA, last LBA, name).
+/// Une partition GPT à synthétiser : (GUID de type en texte, premier LBA, dernier LBA, nom).
 pub type GptSpec<'a> = (&'a str, u64, u64, &'a str);
 
-/// Build a complete GPT disk image (protective MBR, both headers, both entry arrays).
+/// Construit une image disque GPT complète (MBR protecteur, les deux en-têtes, les deux tableaux d'entrées).
 pub fn gpt_image(total_sectors: u64, parts: &[GptSpec<'_>]) -> Vec<u8> {
     let ss = 512usize;
     let mut img = vec![0u8; total_sectors as usize * ss];

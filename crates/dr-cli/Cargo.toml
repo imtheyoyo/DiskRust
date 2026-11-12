@@ -1,6 +1,6 @@
 [package]
 name = "dr-cli"
-description = "diskrust command line front-end (read-only)"
+description = "Interface en ligne de commande de diskrust (lecture seule)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

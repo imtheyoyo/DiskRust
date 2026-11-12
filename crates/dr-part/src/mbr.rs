@@ -1,4 +1,4 @@
-//! MBR + extended partition (EBR chain) parsing.
+//! Analyse du MBR et des partitions étendues (chaîne EBR).
 
 use std::collections::HashSet;
 use std::fmt;
@@ -7,26 +7,26 @@ use dr_disk::BlockDevice;
 
 use crate::types::{PartError, PartKind, Partition, TypeId};
 
-/// Default translation geometry used for CHS consistency checks.
+/// Géométrie de traduction par défaut utilisée pour les contrôles de cohérence CHS.
 pub const DEFAULT_HEADS: u32 = 255;
-/// Default sectors-per-track used for CHS consistency checks.
+/// Nombre de secteurs par piste par défaut utilisé pour les contrôles de cohérence CHS.
 pub const DEFAULT_SECTORS_PER_TRACK: u32 = 63;
-/// Upper bound on EBR links followed (loop / runaway protection).
+/// Borne supérieure du nombre de liens EBR suivis (protection contre les boucles et les dérives).
 const MAX_LOGICAL: usize = 256;
 
-/// A decoded cylinder/head/sector triple.
+/// Triplet cylindre/tête/secteur décodé.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Chs {
-    /// Cylinder (0..=1023).
+    /// Cylindre (0..=1023).
     pub cylinder: u16,
-    /// Head (0..=255).
+    /// Tête (0..=255).
     pub head: u8,
-    /// Sector (1..=63, 0 means invalid).
+    /// Secteur (1..=63, 0 signifie invalide).
     pub sector: u8,
 }
 
 impl Chs {
-    /// Decode the 3-byte on-disk form.
+    /// Décode la forme sur disque de 3 octets.
     pub fn decode(b: [u8; 3]) -> Self {
         Chs {
             head: b[0],
@@ -35,7 +35,7 @@ impl Chs {
         }
     }
 
-    /// Convert to an LBA under the given geometry.
+    /// Convertit en LBA selon la géométrie donnée.
     pub fn to_lba(self, heads: u32, spt: u32) -> Option<u64> {
         if self.sector == 0 {
             return None;
@@ -47,7 +47,7 @@ impl Chs {
         )
     }
 
-    /// CHS values saturate at cylinder 1023 for large disks and are then meaningless.
+    /// Les valeurs CHS saturent au cylindre 1023 sur les gros disques et n'ont alors plus de sens.
     pub fn is_saturated(self) -> bool {
         self.cylinder >= 1023
     }
@@ -59,20 +59,20 @@ impl fmt::Display for Chs {
     }
 }
 
-/// One raw 16-byte partition entry.
+/// Une entrée de partition brute de 16 octets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MbrEntry {
-    /// Boot flag byte (0x80 active, 0x00 inactive).
+    /// Octet d'indicateur d'amorçage (0x80 actif, 0x00 inactif).
     pub boot: u8,
-    /// CHS of first sector.
+    /// CHS du premier secteur.
     pub chs_start: Chs,
-    /// System id.
+    /// Identifiant système.
     pub type_id: u8,
-    /// CHS of last sector.
+    /// CHS du dernier secteur.
     pub chs_end: Chs,
-    /// Start LBA (relative to the table's base).
+    /// LBA de début (relatif à la base de la table).
     pub start_lba: u32,
-    /// Size in sectors.
+    /// Taille en secteurs.
     pub size_sectors: u32,
 }
 
@@ -88,27 +88,27 @@ impl MbrEntry {
         }
     }
 
-    /// Unused slot.
+    /// Emplacement inutilisé.
     pub fn is_empty(&self) -> bool {
         self.type_id == 0 || self.size_sectors == 0
     }
 
-    /// DOS/Win95/Linux extended container.
+    /// Conteneur étendu DOS/Win95/Linux.
     pub fn is_extended(&self) -> bool {
         matches!(self.type_id, 0x05 | 0x0F | 0x85)
     }
 }
 
-/// Result of parsing an Intel partition table.
+/// Résultat de l'analyse d'une table de partitions Intel.
 #[derive(Debug, Clone, Default)]
 pub struct MbrTable {
-    /// Primary, extended and logical partitions in discovery order.
+    /// Partitions primaires, étendues et logiques dans l'ordre de découverte.
     pub partitions: Vec<Partition>,
-    /// Non-fatal diagnostics (CHS mismatches, loops, out-of-range values ...).
+    /// Diagnostics non fatals (incohérences CHS, boucles, valeurs hors limites…).
     pub warnings: Vec<String>,
 }
 
-/// Parse the four entries of a 512-byte boot sector; requires the 0x55AA signature.
+/// Analyse les quatre entrées d'un secteur de démarrage de 512 octets ; exige la signature 0x55AA.
 pub fn parse_mbr_sector(sec: &[u8]) -> Result<[MbrEntry; 4], PartError> {
     if sec.len() < 512 || sec[510] != 0x55 || sec[511] != 0xAA {
         return Err(PartError::BadMbrSignature);
@@ -117,39 +117,39 @@ pub fn parse_mbr_sector(sec: &[u8]) -> Result<[MbrEntry; 4], PartError> {
     Ok([e(0), e(1), e(2), e(3)])
 }
 
-/// Human readable MBR system id.
+/// Identifiant système MBR lisible.
 pub fn mbr_type_name(t: u8) -> &'static str {
     match t {
-        0x00 => "Empty",
+        0x00 => "Vide",
         0x01 => "FAT12",
         0x04 => "FAT16 <32M",
-        0x05 => "Extended",
+        0x05 => "Étendue",
         0x06 => "FAT16",
         0x07 => "HPFS/NTFS/exFAT",
         0x0B => "FAT32",
         0x0C => "FAT32 LBA",
         0x0E => "FAT16 LBA",
-        0x0F => "Extended LBA",
-        0x11 => "Hidden FAT12",
-        0x14 => "Hidden FAT16 <32M",
-        0x16 => "Hidden FAT16",
-        0x17 => "Hidden HPFS/NTFS",
-        0x1B => "Hidden FAT32",
-        0x1C => "Hidden FAT32 LBA",
-        0x1E => "Hidden FAT16 LBA",
-        0x27 => "Hidden NTFS (WinRE)",
+        0x0F => "Étendue LBA",
+        0x11 => "FAT12 masquée",
+        0x14 => "FAT16 <32M masquée",
+        0x16 => "FAT16 masquée",
+        0x17 => "HPFS/NTFS masquée",
+        0x1B => "FAT32 masquée",
+        0x1C => "FAT32 LBA masquée",
+        0x1E => "FAT16 LBA masquée",
+        0x27 => "NTFS masquée (WinRE)",
         0x82 => "Linux swap",
         0x83 => "Linux",
-        0x85 => "Linux extended",
+        0x85 => "Linux étendue",
         0x8E => "Linux LVM",
         0xA5 => "FreeBSD",
         0xA6 => "OpenBSD",
         0xA9 => "NetBSD",
         0xAF => "Apple HFS/HFS+",
-        0xEE => "EFI GPT protective",
+        0xEE => "EFI GPT protectrice",
         0xEF => "EFI System",
-        0xFD => "Linux RAID autodetect",
-        _ => "Unknown",
+        0xFD => "Linux RAID (détection automatique)",
+        _ => "Inconnue",
     }
 }
 
@@ -162,7 +162,7 @@ fn check_entry(
 ) {
     if e.boot != 0x00 && e.boot != 0x80 {
         warnings.push(format!(
-            "{label}: invalid boot flag 0x{:02X} (expected 0x00 or 0x80)",
+            "{label} : indicateur d'amorçage 0x{:02X} invalide (0x00 ou 0x80 attendu)",
             e.boot
         ));
     }
@@ -171,7 +171,7 @@ fn check_entry(
         if let Some(lba) = e.chs_start.to_lba(h, s) {
             if lba != abs_start {
                 warnings.push(format!(
-                    "{label}: CHS/LBA mismatch at start: CHS {} = LBA {lba}, but LBA field = {abs_start}",
+                    "{label} : incohérence CHS/LBA au début : CHS {} = LBA {lba}, mais champ LBA = {abs_start}",
                     e.chs_start
                 ));
             }
@@ -182,7 +182,7 @@ fn check_entry(
         if let Some(lba) = e.chs_end.to_lba(h, s) {
             if lba != abs_end {
                 warnings.push(format!(
-                    "{label}: CHS/LBA mismatch at end: CHS {} = LBA {lba}, but LBA field = {abs_end}",
+                    "{label} : incohérence CHS/LBA à la fin : CHS {} = LBA {lba}, mais champ LBA = {abs_end}",
                     e.chs_end
                 ));
             }
@@ -190,12 +190,12 @@ fn check_entry(
     }
     if abs_end >= disk_sectors {
         warnings.push(format!(
-            "{label}: partition ends at LBA {abs_end}, beyond end of disk ({disk_sectors} sectors)"
+            "{label} : la partition se termine au LBA {abs_end}, au-delà de la fin du disque ({disk_sectors} secteurs)"
         ));
     }
 }
 
-/// Parse the MBR at LBA 0 and follow the extended partition's EBR chain.
+/// Analyse le MBR au LBA 0 et suit la chaîne EBR de la partition étendue.
 pub fn parse_mbr(dev: &dyn BlockDevice) -> Result<MbrTable, PartError> {
     let sec0 = dev.read_sectors(0, 1)?;
     let entries = parse_mbr_sector(&sec0)?;
@@ -207,7 +207,7 @@ pub fn parse_mbr(dev: &dyn BlockDevice) -> Result<MbrTable, PartError> {
         if e.is_empty() {
             if e.type_id != 0 {
                 table.warnings.push(format!(
-                    "Partition {}: type 0x{:02X} with zero size",
+                    "Partition {} : type 0x{:02X} de taille nulle",
                     i + 1,
                     e.type_id
                 ));
@@ -221,7 +221,7 @@ pub fn parse_mbr(dev: &dyn BlockDevice) -> Result<MbrTable, PartError> {
             if extended.is_some() {
                 table
                     .warnings
-                    .push(format!("{label}: more than one extended partition"));
+                    .push(format!("{label} : plus d'une partition étendue"));
             } else {
                 extended = Some((start, u64::from(e.size_sectors)));
             }
@@ -253,27 +253,27 @@ fn walk_ebr_chain(
     table: &mut MbrTable,
 ) {
     let mut visited = HashSet::new();
-    let mut rel = 0u64; // link offsets are always relative to the extended partition start
+    let mut rel = 0u64; // les décalages de liens sont toujours relatifs au début de la partition étendue
     for n in 0..MAX_LOGICAL {
         let ebr_lba = ext_start + rel;
         if !visited.insert(ebr_lba) {
-            table
-                .warnings
-                .push(format!("EBR chain loop detected at LBA {ebr_lba}"));
+            table.warnings.push(format!(
+                "Boucle détectée dans la chaîne EBR au LBA {ebr_lba}"
+            ));
             return;
         }
         if ebr_lba >= ext_start + ext_size || ebr_lba >= disk_sectors {
             table.warnings.push(format!(
-                "EBR at LBA {ebr_lba} lies outside the extended partition"
+                "L'EBR au LBA {ebr_lba} se trouve en dehors de la partition étendue"
             ));
             return;
         }
         let sec = match dev.read_sectors(ebr_lba, 1) {
             Ok(s) => s,
             Err(e) => {
-                table
-                    .warnings
-                    .push(format!("Cannot read EBR at LBA {ebr_lba}: {e}"));
+                table.warnings.push(format!(
+                    "Lecture impossible de l'EBR au LBA {ebr_lba} : {e}"
+                ));
                 return;
             }
         };
@@ -282,7 +282,7 @@ fn walk_ebr_chain(
             Err(_) => {
                 table
                     .warnings
-                    .push(format!("EBR at LBA {ebr_lba}: missing 0x55AA signature"));
+                    .push(format!("EBR au LBA {ebr_lba} : signature 0x55AA absente"));
                 return;
             }
         };
@@ -293,7 +293,7 @@ fn walk_ebr_chain(
                 continue;
             }
             let abs = ebr_lba + u64::from(e.start_lba);
-            let label = format!("Logical {}", n + 5);
+            let label = format!("Logique {}", n + 5);
             check_entry(&label, e, abs, disk_sectors, &mut table.warnings);
             table.partitions.push(Partition {
                 start_lba: abs,
@@ -310,6 +310,6 @@ fn walk_ebr_chain(
         }
     }
     table.warnings.push(format!(
-        "EBR chain longer than {MAX_LOGICAL} entries, giving up"
+        "Chaîne EBR de plus de {MAX_LOGICAL} entrées, abandon"
     ));
 }

@@ -1,8 +1,8 @@
-//! Read-only block device abstraction for `diskrust`.
+//! Abstraction de périphérique bloc en lecture seule pour `diskrust`.
 //!
-//! The central piece is the [`BlockDevice`] trait. Writing is deliberately
-//! kept out of it: any future write support must go through the separate
-//! [`WritableDevice`] trait, which no type in this crate implements.
+//! L'élément central est le trait [`BlockDevice`]. L'écriture en est
+//! volontairement exclue : tout futur support d'écriture devra passer par le
+//! trait distinct [`WritableDevice`], qu'aucun type de cette crate n'implémente.
 
 use std::fs::File;
 use std::io;
@@ -12,51 +12,58 @@ mod physical;
 
 pub use physical::{enumerate_disks, DiskInfo, PhysicalDisk};
 
-/// A random-access, read-only block device.
+/// Un périphérique bloc en lecture seule à accès aléatoire.
 pub trait BlockDevice {
-    /// Logical sector size in bytes (usually 512 or 4096).
+    /// Taille d'un secteur logique en octets (généralement 512 ou 4096).
     fn sector_size(&self) -> u32;
-    /// Total size of the device in bytes.
+    /// Taille totale du périphérique en octets.
     fn size_bytes(&self) -> u64;
-    /// Read exactly `buf.len()` bytes starting at byte `offset`.
+    /// Lit exactement `buf.len()` octets à partir de l'octet `offset`.
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> io::Result<()>;
 
-    /// Number of whole sectors on the device.
+    /// Nombre de secteurs entiers du périphérique.
     fn sector_count(&self) -> u64 {
         self.size_bytes() / u64::from(self.sector_size())
     }
 
-    /// Read `count` sectors starting at `lba` into a fresh buffer.
+    /// Lit `count` secteurs à partir de `lba` dans un nouveau tampon.
     fn read_sectors(&self, lba: u64, count: usize) -> io::Result<Vec<u8>> {
         let ss = u64::from(self.sector_size());
-        let offset = lba
-            .checked_mul(ss)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "LBA overflow"))?;
+        let offset = lba.checked_mul(ss).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "dépassement de capacité du LBA",
+            )
+        })?;
         let mut buf = vec![0u8; count * ss as usize];
         self.read_at(offset, &mut buf)?;
         Ok(buf)
     }
 }
 
-/// Write access to a device.
+/// Accès en écriture à un périphérique.
 ///
-/// TODO: intentionally NOT implemented by any device for now. `diskrust`
-/// is strictly read-only. Any future implementation must be reachable only
-/// behind an explicit user confirmation flag.
+/// TODO : volontairement NON implémenté par aucun périphérique pour le
+/// moment. `diskrust` est strictement en lecture seule. Toute implémentation
+/// future ne devra être accessible que derrière un indicateur de confirmation
+/// explicite de l'utilisateur.
 pub trait WritableDevice: BlockDevice {
-    /// Write `data` at byte `offset`.
+    /// Écrit `data` à l'octet `offset`.
     fn write_at(&self, offset: u64, data: &[u8]) -> io::Result<()>;
 }
 
 pub(crate) fn check_range(offset: u64, len: usize, size: u64) -> io::Result<()> {
-    let end = offset
-        .checked_add(len as u64)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+    let end = offset.checked_add(len as u64).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "dépassement de capacité du décalage",
+        )
+    })?;
     if end > size {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
             format!(
-                "read of {len} bytes at offset {offset} is beyond end of device ({size} bytes)"
+                "lecture de {len} octets au décalage {offset} au-delà de la fin du périphérique ({size} octets)"
             ),
         ));
     }
@@ -87,11 +94,11 @@ pub(crate) fn file_read_exact_at(file: &File, buf: &mut [u8], offset: u64) -> io
 pub(crate) fn file_read_exact_at(_file: &File, _buf: &mut [u8], _offset: u64) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "positional reads are not supported on this platform",
+        "les lectures positionnelles ne sont pas prises en charge sur cette plateforme",
     ))
 }
 
-/// A raw disk image (`.dd`) opened read-only.
+/// Une image disque brute (`.dd`) ouverte en lecture seule.
 #[derive(Debug)]
 pub struct FileImage {
     file: File,
@@ -101,7 +108,7 @@ pub struct FileImage {
 }
 
 impl FileImage {
-    /// Open `path` read-only with a 512-byte sector size.
+    /// Ouvre `path` en lecture seule avec des secteurs de 512 octets.
     pub fn open(path: impl AsRef<Path>) -> io::Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = File::open(&path)?;
@@ -114,14 +121,14 @@ impl FileImage {
         })
     }
 
-    /// Override the sector size (e.g. 4096 for a 4Kn image).
+    /// Remplace la taille de secteur (p. ex. 4096 pour une image 4Kn).
     pub fn with_sector_size(mut self, sector_size: u32) -> Self {
         assert!(sector_size >= 512 && sector_size.is_power_of_two());
         self.sector_size = sector_size;
         self
     }
 
-    /// Path this image was opened from.
+    /// Chemin depuis lequel cette image a été ouverte.
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -140,7 +147,7 @@ impl BlockDevice for FileImage {
     }
 }
 
-/// An in-memory image. Mostly useful for tests and synthetic data.
+/// Une image en mémoire. Surtout utile pour les tests et les données synthétiques.
 #[derive(Debug, Clone)]
 pub struct MemImage {
     data: Vec<u8>,
@@ -148,7 +155,7 @@ pub struct MemImage {
 }
 
 impl MemImage {
-    /// Wrap existing bytes (512-byte sectors).
+    /// Encapsule des octets existants (secteurs de 512 octets).
     pub fn new(data: Vec<u8>) -> Self {
         Self {
             data,
@@ -156,28 +163,28 @@ impl MemImage {
         }
     }
 
-    /// A zero-filled image of `size` bytes.
+    /// Une image de `size` octets remplie de zéros.
     pub fn zeroed(size: usize) -> Self {
         Self::new(vec![0; size])
     }
 
-    /// Override the sector size.
+    /// Remplace la taille de secteur.
     pub fn with_sector_size(mut self, sector_size: u32) -> Self {
         self.sector_size = sector_size;
         self
     }
 
-    /// Mutable access to the backing bytes (this is a RAM buffer, not a device).
+    /// Accès mutable aux octets sous-jacents (c'est un tampon en RAM, pas un périphérique).
     pub fn bytes_mut(&mut self) -> &mut [u8] {
         &mut self.data
     }
 
-    /// Copy `src` into the buffer at `offset`.
+    /// Copie `src` dans le tampon à `offset`.
     pub fn put(&mut self, offset: usize, src: &[u8]) {
         self.data[offset..offset + src.len()].copy_from_slice(src);
     }
 
-    /// Backing bytes.
+    /// Octets sous-jacents.
     pub fn bytes(&self) -> &[u8] {
         &self.data
     }
@@ -198,7 +205,7 @@ impl BlockDevice for MemImage {
     }
 }
 
-/// Format a byte count in a human-readable way: `"500 GB / 465 GiB"`.
+/// Formate un nombre d'octets de façon lisible : `"500 GB / 465 GiB"`.
 pub fn format_size(bytes: u64) -> String {
     fn scaled(bytes: u64, base: f64, units: &[&str]) -> String {
         let mut v = bytes as f64;

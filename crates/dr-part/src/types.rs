@@ -4,73 +4,73 @@ use std::io;
 use crate::gpt::{format_guid, gpt_type_name, GptError};
 use crate::mbr::mbr_type_name;
 
-/// How a partition is stored.
+/// Mode de stockage d'une partition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PartKind {
-    /// Primary MBR partition.
+    /// Partition primaire MBR.
     Primary,
-    /// Extended container partition (MBR).
+    /// Partition étendue servant de conteneur (MBR).
     Extended,
-    /// Logical partition inside an extended partition (EBR chain).
+    /// Partition logique à l'intérieur d'une partition étendue (chaîne EBR).
     Logical,
-    /// GPT partition.
+    /// Partition GPT.
     Gpt,
 }
 
 impl fmt::Display for PartKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            PartKind::Primary => "Primary",
-            PartKind::Extended => "Extended",
-            PartKind::Logical => "Logical",
+            PartKind::Primary => "Primaire",
+            PartKind::Extended => "Étendue",
+            PartKind::Logical => "Logique",
             PartKind::Gpt => "GPT",
         })
     }
 }
 
-/// Partition type identifier.
+/// Identifiant de type de partition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeId {
-    /// One-byte MBR system id.
+    /// Identifiant système MBR sur un octet.
     Mbr(u8),
-    /// GPT type GUID, raw on-disk (mixed-endian) bytes.
+    /// GUID de type GPT, octets bruts tels que sur le disque (mixed-endian).
     Gpt([u8; 16]),
 }
 
-/// A partition described by a table (or discovered by a search).
+/// Partition décrite par une table (ou découverte par une recherche).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Partition {
-    /// First sector (absolute LBA).
+    /// Premier secteur (LBA absolu).
     pub start_lba: u64,
-    /// Length in sectors.
+    /// Longueur en secteurs.
     pub size_sectors: u64,
-    /// Storage kind.
+    /// Mode de stockage.
     pub kind: PartKind,
-    /// Type id (MBR byte or GPT GUID).
+    /// Identifiant de type (octet MBR ou GUID GPT).
     pub type_id: TypeId,
-    /// Human readable name (GPT name, or type description for MBR).
+    /// Nom lisible (nom GPT, ou description du type pour MBR).
     pub name: String,
-    /// Active/bootable flag (MBR 0x80, GPT legacy-BIOS-bootable attribute).
+    /// Indicateur actif/amorçable (MBR 0x80, attribut GPT « amorçable BIOS hérité »).
     pub bootable: bool,
 }
 
 impl Partition {
-    /// Last sector (inclusive). Equal to `start_lba` for empty partitions.
+    /// Dernier secteur (inclus). Égal à `start_lba` pour les partitions vides.
     pub fn end_lba(&self) -> u64 {
         self.start_lba + self.size_sectors.saturating_sub(1)
     }
 }
 
-/// Partition table family found on a disk.
+/// Famille de table de partitions trouvée sur un disque.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableType {
-    /// Intel/PC (MBR) partition table.
+    /// Table de partitions Intel/PC (MBR).
     Intel,
-    /// EFI GPT.
+    /// GPT EFI.
     Gpt,
-    /// Blank disk (no table).
+    /// Disque vierge (aucune table).
     None,
-    /// Something is there but it is not a recognised table.
+    /// Il y a des données, mais ce n'est pas une table reconnue.
     Unknown,
 }
 
@@ -78,14 +78,14 @@ impl fmt::Display for TableType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             TableType::Intel => "Intel",
-            TableType::Gpt => "EFI GPT",
-            TableType::None => "None",
-            TableType::Unknown => "Unknown",
+            TableType::Gpt => "GPT EFI",
+            TableType::None => "Aucune",
+            TableType::Unknown => "Inconnue",
         })
     }
 }
 
-/// Human readable type description of a partition.
+/// Description lisible du type d'une partition.
 pub fn type_label(p: &Partition) -> String {
     match p.type_id {
         TypeId::Mbr(t) => mbr_type_name(t).to_string(),
@@ -95,26 +95,26 @@ pub fn type_label(p: &Partition) -> String {
     }
 }
 
-/// Errors produced by the table parsers.
+/// Erreurs produites par les analyseurs de tables.
 #[derive(Debug)]
 pub enum PartError {
-    /// Underlying I/O failure.
+    /// Échec d'E/S sous-jacent.
     Io(io::Error),
-    /// Sector 0 does not end with 0x55AA.
+    /// Le secteur 0 ne se termine pas par 0x55AA.
     BadMbrSignature,
-    /// No usable GPT (primary and backup both bad). Carries the diagnostic log.
+    /// Aucune GPT exploitable (primaire et secours invalides). Porte le journal de diagnostic.
     NoValidGpt(Vec<String>),
-    /// A specific GPT problem.
+    /// Un problème GPT précis.
     Gpt(GptError),
 }
 
 impl fmt::Display for PartError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PartError::Io(e) => write!(f, "I/O error: {e}"),
-            PartError::BadMbrSignature => f.write_str("Bad MBR: missing 0x55AA signature"),
+            PartError::Io(e) => write!(f, "Erreur d'E/S : {e}"),
+            PartError::BadMbrSignature => f.write_str("MBR invalide : signature 0x55AA absente"),
             PartError::NoValidGpt(log) => {
-                write!(f, "No valid GPT found ({})", log.join("; "))
+                write!(f, "Aucune GPT valide trouvée ({})", log.join("; "))
             }
             PartError::Gpt(e) => write!(f, "{e}"),
         }

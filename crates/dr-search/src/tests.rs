@@ -16,9 +16,9 @@ fn part(start: u64, size: u64, kind: PartKind) -> Partition {
     }
 }
 
-/// 80 MiB disk with FAT32 at 2048, NTFS at 2048+70000 (not cylinder aligned: MiB aligned instead).
+/// Disque de 80 Mio avec FAT32 à 2048, NTFS à 2048+70000 (non aligné sur un cylindre : aligné sur 1 Mio).
 fn disk() -> MemImage {
-    let ntfs_start = 73_728u64; // 36 MiB, MiB aligned
+    let ntfs_start = 73_728u64; // 36 Mio, aligné sur 1 Mio
     let mut img = MemImage::zeroed(512 * 160_000);
     img.put(2048 * 512, &fat32_boot_sector(70_000));
     img.put(ntfs_start as usize * 512, &ntfs_boot_sector(60_000, 4));

@@ -1,76 +1,70 @@
 # diskrust
 
-A **read-only-first** partition analysis toolkit written in Rust: partition
-table parsing (MBR/GPT), filesystem detection and lost-partition search.
+Boîte à outils d'analyse de partitions écrite en Rust, **en lecture seule
+d'abord** : lecture des tables de partitions (MBR/GPT), détection des systèmes
+de fichiers et recherche de partitions perdues.
 
-> **Provenance.** `diskrust` is implemented from public format specifications
-> (UEFI GPT, the classic MBR/EBR layout, Microsoft FAT/exFAT documentation,
-> NTFS boot sector layout, ext2/3/4 on-disk format docs). It contains no
-> third-party source code.
-> Licensed under MIT OR Apache-2.0 (see below).
+> **Provenance.** `diskrust` est implémenté à partir des spécifications
+> publiques des formats (UEFI GPT, structure classique MBR/EBR, documentation
+> Microsoft FAT/exFAT, secteur de démarrage NTFS, format disque ext2/3/4). Il ne
+> contient aucun code source tiers.
+> Double licence MIT OU Apache-2.0 (voir plus bas).
 
-## Goals
+## Objectifs
 
-- Understand and analyse disks without ever modifying them.
-- Small, auditable crates with a clear separation: device access, partition
-  tables, filesystem signatures, searching, CLI.
-- Write support, if it ever exists, will be opt-in, behind a separate trait and
-  an explicit confirmation flag. **Nothing in this repository writes to a disk.**
+- Comprendre et analyser des disques sans jamais les modifier.
+- De petites crates auditables, avec une séparation claire : accès aux
+  périphériques, tables de partitions, signatures de systèmes de fichiers,
+  recherche, ligne de commande.
+- Si l'écriture existe un jour, elle sera optionnelle, derrière un trait
+  distinct et un drapeau de confirmation explicite. **Rien dans ce dépôt
+  n'écrit sur un disque.**
 
-## Workspace layout
+## Organisation du workspace
 
-| Crate | Purpose |
-|-------|---------|
-| `dr-disk` | `BlockDevice` trait; `FileImage` (raw `.dd`), `PhysicalDisk` (Windows `\\.\PhysicalDriveN`, Linux `/dev/sdX`), `enumerate_disks()`; `WritableDevice` declared but unimplemented |
-| `dr-part` | MBR + EBR chain (loop protection, CHS/LBA checks), GPT (header and entry CRC32, backup-header fallback), `detect_table_type()` |
-| `dr-fs`   | FAT12/16/32, NTFS, exFAT, ext2/3/4 detection; `probe(dev, start_lba)` |
-| `dr-search` | Quick Search (cylinder- and 1 MiB-aligned scan), `check_structure()` |
-| `dr-cli`  | `diskrust` binary |
+| Crate | Rôle |
+|-------|------|
+| `dr-disk` | trait `BlockDevice` ; `FileImage` (image brute `.dd`), `PhysicalDisk` (Windows `\\.\PhysicalDriveN`, Linux `/dev/sdX`), `enumerate_disks()` ; `WritableDevice` déclaré mais non implémenté |
+| `dr-part` | MBR + chaîne EBR (protection contre les boucles, contrôles CHS/LBA), GPT (CRC32 de l'en-tête et des entrées, repli sur l'en-tête de secours), `detect_table_type()` |
+| `dr-fs`   | détection FAT12/16/32, NTFS, exFAT, ext2/3/4 ; `probe(dev, start_lba)` |
+| `dr-search` | recherche rapide (balayage aligné sur les cylindres et sur 1 Mio), `check_structure()` |
+| `dr-cli`  | binaire `diskrust` |
 
-## Status
+## État d'avancement
 
-| Feature | Status |
-|---------|--------|
-| Raw image reading | done |
-| Linux block devices | done (ioctl `BLKGETSIZE64`, `BLKSSZGET`) |
-| Windows physical drives | implemented, CI-built on Windows, untested on real hardware |
-| macOS/BSD devices | not yet (regular files only) |
-| MBR / EBR parsing | done |
-| GPT parsing + backup fallback | done |
-| FAT / NTFS / exFAT / ext2-4 detection | done (signature + geometry only) |
-| Quick Search | done |
-| ext backup-superblock search | TODO (stub) |
-| Deeper Search (extra FS types, MFT/inode scans) | TODO |
-| Filesystem listing / file undelete | TODO |
-| Any write operation | intentionally absent (TODO, must require explicit confirmation flag) |
+| Fonction | État |
+|----------|------|
+| Lecture d'images brutes | fait |
+| Périphériques bloc Linux | fait (ioctl `BLKGETSIZE64`, `BLKSSZGET`) |
+| Disques physiques Windows | implémenté, compilé par la CI Windows, non testé sur matériel réel |
+| Périphériques macOS/BSD | pas encore (fichiers ordinaires uniquement) |
+| Analyse MBR / EBR | fait |
+| Analyse GPT + repli sur la table de secours | fait |
+| Détection FAT / NTFS / exFAT / ext2-4 | fait (signature et géométrie seulement) |
+| Recherche rapide | fait |
+| Recherche des superblocs de secours ext | À FAIRE (ébauche) |
+| Recherche approfondie (autres systèmes de fichiers, parcours MFT/inodes) | À FAIRE |
+| Liste des fichiers / récupération de fichiers supprimés | À FAIRE |
+| Toute opération d'écriture | volontairement absente (À FAIRE, drapeau de confirmation explicite obligatoire) |
 
-## Usage
+## Utilisation
 
 ```console
 $ cargo build --release
-$ diskrust list --image disk.dd        # list disks and partitions
-$ diskrust list /dev/sda               # needs read permission on the device
-$ diskrust list                        # enumerate and list all readable disks
-$ diskrust analyse --image disk.dd     # table + "Structure: Ok/Bad" + Quick Search
-$ diskrust analyse /dev/sdb --log      # also append a transcript to diskrust.log
+$ diskrust list --image disque.dd      # liste les disques et partitions
+$ diskrust list /dev/sda               # nécessite le droit de lecture sur le périphérique
+$ diskrust list                        # énumère et liste tous les disques lisibles
+$ diskrust analyse --image disque.dd   # table + « Structure : Ok/Bad » + recherche rapide
+$ diskrust analyse /dev/sdb --log      # ajoute aussi un journal dans diskrust.log
 ```
 
-On Windows use `\\.\PhysicalDrive0` and an elevated terminal.
+Sous Windows, utiliser `\\.\PhysicalDrive0` dans un terminal élevé
+(administrateur).
 
-Development: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`.
+Développement : `cargo fmt --check`,
+`cargo clippy --workspace --all-targets -- -D warnings`, `cargo test`.
 
-## Section francaise
+## Licence
 
-`diskrust` est une boite a outils d'analyse de partitions ecrite en Rust a partir
-des specifications publiques des formats (MBR, GPT, FAT, NTFS, exFAT, ext2/3/4),
-sans reprise de code tiers. Elle fonctionne en **lecture seule** : aucune
-ecriture sur le disque n'est implementee. Commandes :
-`diskrust list` (liste des disques et partitions) et `diskrust analyse`
-(table de partitions, verification de structure, recherche rapide).
-Les ecritures futures devront imposer un drapeau de confirmation explicite.
-Voir le tableau d'etat ci-dessus pour les fonctions manquantes.
-
-## License
-
-Dual-licensed under either of [MIT](LICENSE-MIT) or
-[Apache-2.0](LICENSE-APACHE) at your option.
+Double licence, au choix : [MIT](LICENSE-MIT) ou
+[Apache-2.0](LICENSE-APACHE).

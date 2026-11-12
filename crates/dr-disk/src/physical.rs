@@ -1,4 +1,4 @@
-//! Physical disk access (Windows `\\.\PhysicalDriveN`, Linux `/dev/sdX`).
+//! Accès aux disques physiques (Windows `\\.\PhysicalDriveN`, Linux `/dev/sdX`).
 
 use std::fs::File;
 use std::io;
@@ -6,23 +6,23 @@ use std::path::{Path, PathBuf};
 
 use crate::{check_range, file_read_exact_at, BlockDevice};
 
-/// Basic description of a disk found by [`enumerate_disks`].
+/// Description sommaire d'un disque trouvé par [`enumerate_disks`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiskInfo {
-    /// Device path, e.g. `/dev/sda` or `\\.\PhysicalDrive0`.
+    /// Chemin du périphérique, p. ex. `/dev/sda` ou `\\.\PhysicalDrive0`.
     pub path: String,
-    /// Size in bytes.
+    /// Taille en octets.
     pub size_bytes: u64,
-    /// Logical sector size in bytes.
+    /// Taille d'un secteur logique en octets.
     pub sector_size: u32,
-    /// Model string when available.
+    /// Chaîne du modèle lorsqu'elle est disponible.
     pub model: Option<String>,
 }
 
-/// A physical disk opened read-only.
+/// Un disque physique ouvert en lecture seule.
 ///
-/// All reads are issued sector-aligned, as raw devices (notably on Windows)
-/// require.
+/// Toutes les lectures sont émises alignées sur les secteurs, comme l'exigent
+/// les périphériques bruts (notamment sous Windows).
 #[derive(Debug)]
 pub struct PhysicalDisk {
     file: File,
@@ -32,7 +32,7 @@ pub struct PhysicalDisk {
 }
 
 impl PhysicalDisk {
-    /// Open a device (or, as a convenience, a regular file) read-only.
+    /// Ouvre un périphérique (ou, par commodité, un fichier ordinaire) en lecture seule.
     pub fn open(path: impl AsRef<Path>) -> io::Result<Self> {
         let path = path.as_ref().to_path_buf();
         let (file, size, sector_size) = sys::open(&path)?;
@@ -44,14 +44,14 @@ impl PhysicalDisk {
         })
     }
 
-    /// Device path this disk was opened from.
+    /// Chemin du périphérique depuis lequel ce disque a été ouvert.
     pub fn path(&self) -> &Path {
         &self.path
     }
 }
 
-/// Perform an unaligned read of `buf.len()` bytes at `offset` using only
-/// sector-aligned raw reads.
+/// Effectue une lecture non alignée de `buf.len()` octets à `offset` en
+/// n'utilisant que des lectures brutes alignées sur les secteurs.
 pub(crate) fn aligned_read(
     raw: &dyn Fn(u64, &mut [u8]) -> io::Result<()>,
     sector_size: u32,
@@ -94,11 +94,11 @@ impl BlockDevice for PhysicalDisk {
     }
 }
 
-/// List the physical disks visible to this process.
+/// Liste les disques physiques visibles par ce processus.
 ///
-/// Windows: probes `\\.\PhysicalDrive0..15`. Linux: walks `/sys/block`.
-/// Disks that cannot be opened (e.g. missing privileges) are skipped on
-/// Windows; on Linux they are listed from sysfs data.
+/// Windows : sonde `\\.\PhysicalDrive0..15`. Linux : parcourt `/sys/block`.
+/// Les disques impossibles à ouvrir (p. ex. privilèges manquants) sont ignorés
+/// sous Windows ; sous Linux, ils sont listés à partir des données sysfs.
 pub fn enumerate_disks() -> Vec<DiskInfo> {
     sys::enumerate()
 }
@@ -120,7 +120,7 @@ mod sys {
         let file = File::open(path)?;
         let fd = file.as_raw_fd();
         let mut size: u64 = 0;
-        // SAFETY: `size` is a valid u64 out-pointer for BLKGETSIZE64.
+        // SÉCURITÉ : `size` est un pointeur de sortie u64 valide pour BLKGETSIZE64.
         let r = unsafe { libc::ioctl(fd, BLKGETSIZE64 as _, &mut size as *mut u64) };
         let err = io::Error::last_os_error();
         let size = if r == 0 {
@@ -134,7 +134,7 @@ mod sys {
             }
         };
         let mut ss: libc::c_int = 0;
-        // SAFETY: `ss` is a valid c_int out-pointer for BLKSSZGET.
+        // SÉCURITÉ : `ss` est un pointeur de sortie c_int valide pour BLKSSZGET.
         let r = unsafe { libc::ioctl(fd, BLKSSZGET as _, &mut ss as *mut libc::c_int) };
         let ss = if r == 0 && ss > 0 { ss as u32 } else { 512 };
         Ok((file, size, ss))
@@ -186,8 +186,9 @@ mod sys {
     use std::io;
     use std::path::Path;
 
-    // TODO: BSD/macOS ioctls (DIOCGMEDIASIZE / DKIOCGETBLOCKCOUNT). For now only
-    // regular files / devices that report a length through metadata work.
+    // TODO : ioctl BSD/macOS (DIOCGMEDIASIZE / DKIOCGETBLOCKCOUNT). Pour l'instant,
+    // seuls les fichiers ordinaires et les périphériques qui indiquent une taille
+    // via leurs métadonnées fonctionnent.
     pub fn open(path: &Path) -> io::Result<(File, u64, u32)> {
         let file = File::open(path)?;
         let len = file.metadata()?.len();
@@ -218,8 +219,9 @@ mod sys {
 
     fn ioctl_out(file: &File, code: u32, out: &mut [u8]) -> io::Result<u32> {
         let mut returned = 0u32;
-        // SAFETY: the handle is valid for the lifetime of `file`; `out` is a
-        // valid writable buffer of the stated length; no input buffer is used.
+        // SÉCURITÉ : le handle est valide pendant toute la durée de vie de `file` ;
+        // `out` est un tampon inscriptible valide de la longueur indiquée ; aucun
+        // tampon d'entrée n'est utilisé.
         let ok = unsafe {
             DeviceIoControl(
                 file.as_raw_handle() as HANDLE,
@@ -245,7 +247,7 @@ mod sys {
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        // SAFETY: `wide` is a NUL-terminated UTF-16 string; read-only access.
+        // SÉCURITÉ : `wide` est une chaîne UTF-16 terminée par NUL ; accès en lecture seule.
         let handle = unsafe {
             CreateFileW(
                 wide.as_ptr(),
@@ -260,10 +262,10 @@ mod sys {
         if handle == INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
         }
-        // SAFETY: `handle` is a valid, owned handle returned by CreateFileW.
+        // SÉCURITÉ : `handle` est un handle valide et possédé, renvoyé par CreateFileW.
         let file = unsafe { File::from_raw_handle(handle as RawHandle) };
 
-        // DISK_GEOMETRY_EX: DISK_GEOMETRY (24 bytes, BytesPerSector at +20) then DiskSize (i64 at +24).
+        // DISK_GEOMETRY_EX : DISK_GEOMETRY (24 octets, BytesPerSector à +20) puis DiskSize (i64 à +24).
         let mut geo = [0u8; 128];
         let geo_ok = ioctl_out(&file, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, &mut geo).is_ok();
         let bps = u32::from_le_bytes(geo[20..24].try_into().unwrap());
@@ -312,7 +314,7 @@ mod sys {
     pub fn open(_path: &Path) -> io::Result<(File, u64, u32)> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "physical disks are not supported on this platform",
+            "les disques physiques ne sont pas pris en charge sur cette plateforme",
         ))
     }
 
@@ -329,8 +331,16 @@ mod tests {
     fn aligned_read_handles_unaligned_ranges() {
         let data: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
         let raw = |o: u64, b: &mut [u8]| -> io::Result<()> {
-            assert_eq!(o % 512, 0, "raw read must be sector aligned");
-            assert_eq!(b.len() % 512, 0, "raw read length must be sector aligned");
+            assert_eq!(
+                o % 512,
+                0,
+                "la lecture brute doit être alignée sur les secteurs"
+            );
+            assert_eq!(
+                b.len() % 512,
+                0,
+                "la longueur de lecture brute doit être alignée sur les secteurs"
+            );
             b.copy_from_slice(&data[o as usize..o as usize + b.len()]);
             Ok(())
         };

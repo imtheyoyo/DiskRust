@@ -47,12 +47,12 @@ fn mbr_bad_signature() {
 fn mbr_chs_mismatch_warns() {
     let mut img = MemImage::zeroed(512 * 100_000);
     let mut e = mbr_entry(0x00, 0x83, 2048, 10_000);
-    e[1..4].copy_from_slice(&lba_to_chs(4096)); // wrong start CHS
+    e[1..4].copy_from_slice(&lba_to_chs(4096)); // CHS de début erroné
     img.put(0, &mbr_sector(&[e]));
     let t = parse_mbr(&img).unwrap();
     assert_eq!(t.partitions.len(), 1);
     assert!(
-        t.warnings.iter().any(|w| w.contains("CHS/LBA mismatch")),
+        t.warnings.iter().any(|w| w.contains("incohérence CHS/LBA")),
         "{:?}",
         t.warnings
     );
@@ -68,14 +68,14 @@ fn mbr_extended_chain() {
             mbr_entry(0, 0x0F, 10_000, 50_000),
         ]),
     );
-    // EBR 1 at 10000: logical at +63, link to +20000 (relative to extended start)
+    // EBR 1 au LBA 10000 : logique à +63, lien vers +20000 (relatif au début de l'étendue)
     let ebr1 = mbr_sector(&[mbr_entry(0, 0x83, 63, 9_000), {
         let mut l = mbr_entry(0, 0x05, 20_000, 5_000);
         l[8..12].copy_from_slice(&10_000u32.to_le_bytes());
         l
     }]);
     img.put(10_000 * 512, &ebr1);
-    // EBR 2 at 10000+10000=20000: logical at +63, no link
+    // EBR 2 au LBA 10000+10000=20000 : logique à +63, sans lien
     let ebr2 = mbr_sector(&[mbr_entry(0, 0x82, 63, 4_000)]);
     img.put(20_000 * 512, &ebr2);
     let t = parse_mbr(&img).unwrap();
@@ -94,7 +94,7 @@ fn mbr_extended_chain() {
 fn mbr_ebr_loop_is_detected() {
     let mut img = MemImage::zeroed(512 * 100_000);
     img.put(0, &mbr_sector(&[mbr_entry(0, 0x05, 1000, 50_000)]));
-    // EBR at 1000 links to itself (relative 0).
+    // L'EBR au LBA 1000 pointe vers lui-même (relatif 0).
     let mut link = mbr_entry(0, 0x05, 0, 1000);
     link[8..12].copy_from_slice(&0u32.to_le_bytes());
     img.put(
@@ -103,7 +103,7 @@ fn mbr_ebr_loop_is_detected() {
     );
     let t = parse_mbr(&img).unwrap();
     assert!(
-        t.warnings.iter().any(|w| w.contains("loop")),
+        t.warnings.iter().any(|w| w.contains("Boucle")),
         "{:?}",
         t.warnings
     );
@@ -119,7 +119,7 @@ fn mbr_ebr_loop_is_detected() {
 #[test]
 fn guid_roundtrip_and_names() {
     let raw = parse_guid(ESP).unwrap();
-    assert_eq!(raw[0..4], [0x28, 0x73, 0x2A, 0xC1]); // mixed endian
+    assert_eq!(raw[0..4], [0x28, 0x73, 0x2A, 0xC1]); // mixed-endian
     assert_eq!(format_guid(&raw), ESP);
     assert_eq!(gpt_type_name(&raw), Some("EFI System"));
     assert!(parse_guid("nope").is_none());
@@ -148,7 +148,7 @@ fn gpt_valid() {
 #[test]
 fn gpt_corrupt_primary_header_falls_back_to_backup() {
     let mut data = gpt_disk();
-    data[512 + 40] ^= 0xFF; // corrupt first_usable_lba: header CRC no longer matches
+    data[512 + 40] ^= 0xFF; // corrompt first_usable_lba : le CRC de l'en-tête ne correspond plus
     let img = MemImage::new(data);
     let t = parse_gpt(&img).unwrap();
     assert!(t.used_backup);
@@ -156,20 +156,23 @@ fn gpt_corrupt_primary_header_falls_back_to_backup() {
     assert!(t
         .warnings
         .iter()
-        .any(|w| w.contains("invalid header checksum")));
-    assert!(t.warnings.iter().any(|w| w == "Trying alternate GPT"));
+        .any(|w| w.contains("somme de contrôle de l'en-tête incorrecte")));
+    assert!(t
+        .warnings
+        .iter()
+        .any(|w| w == "Tentative avec la GPT de secours"));
 }
 
 #[test]
 fn gpt_corrupt_primary_entries_falls_back_to_backup() {
     let mut data = gpt_disk();
-    data[2 * 512 + 32] ^= 0x01; // corrupt an entry in the primary array
+    data[2 * 512 + 32] ^= 0x01; // corrompt une entrée du tableau primaire
     let t = parse_gpt(&MemImage::new(data)).unwrap();
     assert!(t.used_backup);
     assert!(t
         .warnings
         .iter()
-        .any(|w| w.contains("invalid partition entries checksum")));
+        .any(|w| w.contains("somme de contrôle des entrées de partition incorrecte")));
 }
 
 #[test]
@@ -184,7 +187,7 @@ fn gpt_both_corrupt_is_error() {
 
 #[test]
 fn gpt_sanity_checks() {
-    // Bad entry size, with a re-computed, valid header CRC.
+    // Taille d'entrée invalide, avec un CRC d'en-tête recalculé et valide.
     let mut data = gpt_disk();
     data[512 + 84..512 + 88].copy_from_slice(&100u32.to_le_bytes());
     data[512 + 16..512 + 20].fill(0);
@@ -192,9 +195,9 @@ fn gpt_sanity_checks() {
     data[512 + 16..512 + 20].copy_from_slice(&crc.to_le_bytes());
     let h = GptHeader::parse(&data[512..1024]).unwrap();
     assert_eq!(h.entry_size, 100);
-    let t = parse_gpt(&MemImage::new(data)).unwrap(); // falls back to the good backup
+    let t = parse_gpt(&MemImage::new(data)).unwrap(); // repli sur la bonne copie de secours
     assert!(t.used_backup);
-    assert!(t.warnings[0].contains("invalid partition entry size"));
+    assert!(t.warnings[0].contains("taille d'entrée de partition incorrecte"));
     assert!(matches!(
         GptHeader::parse(&[0u8; 512]),
         Err(GptError::BadSignature)
