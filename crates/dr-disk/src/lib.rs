@@ -218,8 +218,8 @@ pub fn format_size(bytes: u64) -> String {
     }
     format!(
         "{} / {}",
-        scaled(bytes, 1000.0, &["B", "kB", "MB", "GB", "TB", "PB"]),
-        scaled(bytes, 1024.0, &["B", "KiB", "MiB", "GiB", "TiB", "PiB"])
+        scaled(bytes, 1000.0, &["o", "ko", "Mo", "Go", "To", "Po"]),
+        scaled(bytes, 1024.0, &["o", "Kio", "Mio", "Gio", "Tio", "Pio"])
     )
 }
 
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn size_formatting() {
-        assert_eq!(format_size(64 * 1024 * 1024), "67 MB / 64 MiB");
-        assert_eq!(format_size(100), "100 B / 100 B");
+        assert_eq!(format_size(64 * 1024 * 1024), "67 Mo / 64 Mio");
+        assert_eq!(format_size(100), "100 o / 100 o");
     }
 }
