@@ -1,0 +1,26 @@
+[package]
+name = "dr-cli"
+description = "diskrust command line front-end (read-only)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+name = "dr_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "diskrust"
+path = "src/main.rs"
+
+[dependencies]
+dr-disk = { workspace = true }
+dr-part = { workspace = true }
+dr-fs = { workspace = true }
+dr-search = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

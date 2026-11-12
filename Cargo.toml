@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/dr-disk",
+    "crates/dr-part",
+    "crates/dr-fs",
+    "crates/dr-search",
+    "crates/dr-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/imtheyoyo/DiskRust"
+authors = ["diskrust contributors"]
+
+[workspace.dependencies]
+dr-disk = { path = "crates/dr-disk", version = "0.1.0" }
+dr-part = { path = "crates/dr-part", version = "0.1.0" }
+dr-fs = { path = "crates/dr-fs", version = "0.1.0" }
+dr-search = { path = "crates/dr-search", version = "0.1.0" }
+crc32fast = "1"
+libc = "0.2"
+windows-sys = "0.59"
+clap = { version = "4", features = ["derive"] }
+tempfile = "3"

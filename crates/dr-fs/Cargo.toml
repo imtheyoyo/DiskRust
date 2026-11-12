@@ -1,0 +1,11 @@
+[package]
+name = "dr-fs"
+description = "Filesystem signature detection (FAT, NTFS, exFAT, ext2/3/4)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+dr-disk = { workspace = true }

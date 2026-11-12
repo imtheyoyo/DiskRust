@@ -1,0 +1,12 @@
+[package]
+name = "dr-part"
+description = "MBR/EBR and GPT partition table parsers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+dr-disk = { workspace = true }
+crc32fast = { workspace = true }
