@@ -205,7 +205,7 @@ impl BlockDevice for MemImage {
     }
 }
 
-/// Formate un nombre d'octets de façon lisible : `"500 GB / 465 GiB"`.
+/// Formate un nombre d'octets de façon lisible : `"500 Go / 465 Gio"`.
 pub fn format_size(bytes: u64) -> String {
     fn scaled(bytes: u64, base: f64, units: &[&str]) -> String {
         let mut v = bytes as f64;
